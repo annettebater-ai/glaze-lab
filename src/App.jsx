@@ -12,24 +12,20 @@ function App() {
 
   useEffect(() => {
     const hash = window.location.hash
-    const fullUrl = window.location.href
-    
-    setDebugInfo(`Hash: ${hash || 'empty'}`)
 
     if (hash && hash.includes('access_token')) {
-      // Remove the # and parse all parameters
-      const paramString = hash.substring(1)
-      const params = new URLSearchParams(paramString)
-      const token = params.get('access_token')
-      
-      console.log('Token found:', token ? 'yes' : 'no')
-      
+      // Manually extract the access_token value
+      const tokenMatch = hash.match(/access_token=([^&]+)/)
+      const token = tokenMatch ? tokenMatch[1] : null
+
+      setDebugInfo(`Token extracted: ${token ? token.substring(0, 20) + '...' : 'failed'}`)
+
       if (token) {
         localStorage.setItem('google_access_token', token)
-        // Clear the hash from the URL
         history.replaceState(null, null, window.location.pathname)
         fetchUserInfo(token)
       } else {
+        setDebugInfo('Token extraction failed')
         setLoading(false)
       }
     } else {
@@ -37,6 +33,7 @@ function App() {
       if (storedToken) {
         fetchUserInfo(storedToken)
       } else {
+        setDebugInfo('No token found')
         setLoading(false)
       }
     }
@@ -52,11 +49,11 @@ function App() {
         setUserName(data.given_name || data.email)
         setIsSignedIn(true)
       } else {
-        console.log('Token invalid, clearing')
+        setDebugInfo('Token rejected by Google')
         localStorage.removeItem('google_access_token')
       }
     } catch (error) {
-      console.error('Error fetching user info:', error)
+      setDebugInfo(`Fetch error: ${error.message}`)
       localStorage.removeItem('google_access_token')
     }
     setLoading(false)
@@ -85,6 +82,9 @@ function App() {
           <div className="login-card">
             <h1>Glaze Lab</h1>
             <p>Loading...</p>
+            <p style={{fontSize: '10px', marginTop: '16px', color: '#999'}}>
+              {debugInfo}
+            </p>
           </div>
         </div>
       </div>
