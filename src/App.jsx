@@ -14,23 +14,26 @@ function App() {
     const hash = window.location.hash
     const fullUrl = window.location.href
     
-    console.log('Hash:', hash)
-    console.log('Full URL:', fullUrl)
-    
-    setDebugInfo(`Hash: ${hash || 'empty'} | URL: ${fullUrl}`)
+    setDebugInfo(`Hash: ${hash || 'empty'}`)
 
-    if (hash.includes('access_token')) {
-      const params = new URLSearchParams(hash.substring(1))
+    if (hash && hash.includes('access_token')) {
+      // Remove the # and parse all parameters
+      const paramString = hash.substring(1)
+      const params = new URLSearchParams(paramString)
       const token = params.get('access_token')
+      
       console.log('Token found:', token ? 'yes' : 'no')
+      
       if (token) {
         localStorage.setItem('google_access_token', token)
-        window.location.hash = ''
+        // Clear the hash from the URL
+        history.replaceState(null, null, window.location.pathname)
         fetchUserInfo(token)
+      } else {
+        setLoading(false)
       }
     } else {
       const storedToken = localStorage.getItem('google_access_token')
-      console.log('Stored token:', storedToken ? 'yes' : 'no')
       if (storedToken) {
         fetchUserInfo(storedToken)
       } else {
@@ -66,7 +69,6 @@ function App() {
       `&response_type=token` +
       `&scope=${encodeURIComponent(SCOPES)}` +
       `&prompt=consent`
-    console.log('Redirecting to:', authUrl)
     window.location.href = authUrl
   }
 
