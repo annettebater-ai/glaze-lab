@@ -8,21 +8,29 @@ function App() {
   const [isSignedIn, setIsSignedIn] = useState(false)
   const [userName, setUserName] = useState('')
   const [loading, setLoading] = useState(true)
+  const [debugInfo, setDebugInfo] = useState('')
 
   useEffect(() => {
-    // Check if we're returning from Google OAuth
     const hash = window.location.hash
+    const fullUrl = window.location.href
+    
+    console.log('Hash:', hash)
+    console.log('Full URL:', fullUrl)
+    
+    setDebugInfo(`Hash: ${hash || 'empty'} | URL: ${fullUrl}`)
+
     if (hash.includes('access_token')) {
       const params = new URLSearchParams(hash.substring(1))
       const token = params.get('access_token')
+      console.log('Token found:', token ? 'yes' : 'no')
       if (token) {
         localStorage.setItem('google_access_token', token)
         window.location.hash = ''
         fetchUserInfo(token)
       }
     } else {
-      // Check if we have a stored token
       const storedToken = localStorage.getItem('google_access_token')
+      console.log('Stored token:', storedToken ? 'yes' : 'no')
       if (storedToken) {
         fetchUserInfo(storedToken)
       } else {
@@ -41,6 +49,7 @@ function App() {
         setUserName(data.given_name || data.email)
         setIsSignedIn(true)
       } else {
+        console.log('Token invalid, clearing')
         localStorage.removeItem('google_access_token')
       }
     } catch (error) {
@@ -57,6 +66,7 @@ function App() {
       `&response_type=token` +
       `&scope=${encodeURIComponent(SCOPES)}` +
       `&prompt=consent`
+    console.log('Redirecting to:', authUrl)
     window.location.href = authUrl
   }
 
@@ -89,17 +99,22 @@ function App() {
             <button onClick={handleSignIn} className="google-btn">
               Sign in with Google
             </button>
+            <p style={{fontSize: '10px', marginTop: '16px', color: '#999', wordBreak: 'break-all'}}>
+              {debugInfo}
+            </p>
           </div>
         </div>
       ) : (
-        <div className="home-screen">
-          <div className="home-header">
-            <h1>Glaze Lab</h1>
-            <button onClick={handleSignOut} className="signout-btn">
-              Sign out
-            </button>
+        <div className="app">
+          <div className="home-screen">
+            <div className="home-header">
+              <h1>Glaze Lab</h1>
+              <button onClick={handleSignOut} className="signout-btn">
+                Sign out
+              </button>
+            </div>
+            <p>Welcome, {userName}. Your vault is connected.</p>
           </div>
-          <p>Welcome, {userName}. Your vault is connected.</p>
         </div>
       )}
     </div>
