@@ -2,7 +2,11 @@ import { useState, useEffect } from 'react'
 import './App.css'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
-const SCOPES = 'https://www.googleapis.com/auth/drive.file'
+const SCOPES = [
+  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/userinfo.profile',
+  'https://www.googleapis.com/auth/userinfo.email'
+].join(' ')
 
 function App() {
   const [isSignedIn, setIsSignedIn] = useState(false)
@@ -14,11 +18,8 @@ function App() {
     const hash = window.location.hash
 
     if (hash && hash.includes('access_token')) {
-      // Manually extract the access_token value
       const tokenMatch = hash.match(/access_token=([^&]+)/)
       const token = tokenMatch ? tokenMatch[1] : null
-
-      setDebugInfo(`Token extracted: ${token ? token.substring(0, 20) + '...' : 'failed'}`)
 
       if (token) {
         localStorage.setItem('google_access_token', token)
@@ -33,7 +34,7 @@ function App() {
       if (storedToken) {
         fetchUserInfo(storedToken)
       } else {
-        setDebugInfo('No token found')
+        setDebugInfo('No token — please sign in')
         setLoading(false)
       }
     }
@@ -44,12 +45,13 @@ function App() {
       const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
         headers: { Authorization: `Bearer ${token}` }
       })
+      const data = await response.json()
+      
       if (response.ok) {
-        const data = await response.json()
         setUserName(data.given_name || data.email)
         setIsSignedIn(true)
       } else {
-        setDebugInfo('Token rejected by Google')
+        setDebugInfo(`Error ${response.status}: ${JSON.stringify(data)}`)
         localStorage.removeItem('google_access_token')
       }
     } catch (error) {
@@ -82,7 +84,7 @@ function App() {
           <div className="login-card">
             <h1>Glaze Lab</h1>
             <p>Loading...</p>
-            <p style={{fontSize: '10px', marginTop: '16px', color: '#999'}}>
+            <p style={{fontSize: '10px', marginTop: '16px', color: '#999', wordBreak: 'break-all'}}>
               {debugInfo}
             </p>
           </div>
