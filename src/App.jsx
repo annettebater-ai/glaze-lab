@@ -3,6 +3,10 @@ import Navigation from './Navigation'
 import './App.css'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
+const REDIRECT_URI = window.location.hostname === 'localhost' 
+  ? 'http://localhost:5173'
+  : 'https://glaze-lab-six.vercel.app'
+
 const SCOPES = [
   'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/userinfo.profile',
@@ -60,7 +64,7 @@ function App() {
   const handleSignIn = () => {
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
       `client_id=${GOOGLE_CLIENT_ID}` +
-      `&redirect_uri=${encodeURIComponent(window.location.origin)}` +
+      `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
       `&response_type=token` +
       `&scope=${encodeURIComponent(SCOPES)}` +
       `&prompt=consent`
