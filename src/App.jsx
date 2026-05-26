@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import Navigation from './Navigation'
 import './App.css'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
@@ -12,21 +13,19 @@ function App() {
   const [isSignedIn, setIsSignedIn] = useState(false)
   const [userName, setUserName] = useState('')
   const [loading, setLoading] = useState(true)
-  const [debugInfo, setDebugInfo] = useState('')
+  const [currentScreen, setCurrentScreen] = useState('recipes')
+  const [accessToken, setAccessToken] = useState(null)
 
   useEffect(() => {
     const hash = window.location.hash
-
     if (hash && hash.includes('access_token')) {
       const tokenMatch = hash.match(/access_token=([^&]+)/)
       const token = tokenMatch ? tokenMatch[1] : null
-
       if (token) {
         localStorage.setItem('google_access_token', token)
         history.replaceState(null, null, window.location.pathname)
         fetchUserInfo(token)
       } else {
-        setDebugInfo('Token extraction failed')
         setLoading(false)
       }
     } else {
@@ -34,7 +33,6 @@ function App() {
       if (storedToken) {
         fetchUserInfo(storedToken)
       } else {
-        setDebugInfo('No token — please sign in')
         setLoading(false)
       }
     }
@@ -46,16 +44,14 @@ function App() {
         headers: { Authorization: `Bearer ${token}` }
       })
       const data = await response.json()
-      
       if (response.ok) {
         setUserName(data.given_name || data.email)
+        setAccessToken(token)
         setIsSignedIn(true)
       } else {
-        setDebugInfo(`Error ${response.status}: ${JSON.stringify(data)}`)
         localStorage.removeItem('google_access_token')
       }
     } catch (error) {
-      setDebugInfo(`Fetch error: ${error.message}`)
       localStorage.removeItem('google_access_token')
     }
     setLoading(false)
@@ -75,6 +71,7 @@ function App() {
     localStorage.removeItem('google_access_token')
     setIsSignedIn(false)
     setUserName('')
+    setAccessToken(null)
   }
 
   if (loading) {
@@ -84,9 +81,22 @@ function App() {
           <div className="login-card">
             <h1>Glaze Lab</h1>
             <p>Loading...</p>
-            <p style={{fontSize: '10px', marginTop: '16px', color: '#999', wordBreak: 'break-all'}}>
-              {debugInfo}
-            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isSignedIn) {
+    return (
+      <div className="app">
+        <div className="login-screen">
+          <div className="login-card">
+            <h1>Glaze Lab</h1>
+            <p>Your personal glaze chemistry studio</p>
+            <button onClick={handleSignIn} className="google-btn">
+              Sign in with Google
+            </button>
           </div>
         </div>
       </div>
@@ -95,32 +105,42 @@ function App() {
 
   return (
     <div className="app">
-      {!isSignedIn ? (
-        <div className="login-screen">
-          <div className="login-card">
-            <h1>Glaze Lab</h1>
-            <p>Your personal glaze chemistry studio</p>
-            <button onClick={handleSignIn} className="google-btn">
-              Sign in with Google
-            </button>
-            <p style={{fontSize: '10px', marginTop: '16px', color: '#999', wordBreak: 'break-all'}}>
-              {debugInfo}
-            </p>
-          </div>
+      <div className="screen-container">
+        <div className="screen-header">
+          <h1>Glaze Lab</h1>
+          <button onClick={handleSignOut} className="signout-btn">
+            Sign out
+          </button>
         </div>
-      ) : (
-        <div className="app">
-          <div className="home-screen">
-            <div className="home-header">
-              <h1>Glaze Lab</h1>
-              <button onClick={handleSignOut} className="signout-btn">
-                Sign out
-              </button>
+        <div className="screen-content">
+          {currentScreen === 'recipes' && (
+            <div className="placeholder-screen">
+              <p>Recipes coming next</p>
             </div>
-            <p>Welcome, {userName}. Your vault is connected.</p>
-          </div>
+          )}
+          {currentScreen === 'tests' && (
+            <div className="placeholder-screen">
+              <p>Test Results coming soon</p>
+            </div>
+          )}
+          {currentScreen === 'mix' && (
+            <div className="placeholder-screen">
+              <p>Mixing Sessions coming soon</p>
+            </div>
+          )}
+          {currentScreen === 'firings' && (
+            <div className="placeholder-screen">
+              <p>Firings coming soon</p>
+            </div>
+          )}
+          {currentScreen === 'search' && (
+            <div className="placeholder-screen">
+              <p>Search coming soon</p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
+      <Navigation currentScreen={currentScreen} onNavigate={setCurrentScreen} />
     </div>
   )
 }

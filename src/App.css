@@ -68,3 +68,51 @@ body {
 .home-screen {
   padding: 24px;
 }
+.screen-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding-bottom: 64px;
+}
+
+.screen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.screen-header h1 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a3a5c;
+}
+
+.signout-btn {
+  background: none;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: #666;
+  cursor: pointer;
+}
+
+.screen-content {
+  flex: 1;
+  padding: 20px;
+}
+
+.placeholder-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #999;
+  font-size: 16px;
+}
