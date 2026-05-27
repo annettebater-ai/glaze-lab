@@ -1,17 +1,23 @@
 import { useState, useEffect } from 'react'
-import Navigation from './Navigation'
+import Sidebar from './Sidebar'
+import BottomNav from './BottomNav'
+import MoreScreen from './MoreScreen'
+import RecipeLibrary from './RecipeLibrary'
+import RecipeForm from './RecipeForm'
+import { ensureVaultStructure, listFiles, readFile, createFile, findFile, updateFile, recipeToMarkdown, markdownToRecipe } from './drive'
 import './App.css'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
-const REDIRECT_URI = window.location.hostname === 'localhost' 
+const REDIRECT_URI = window.location.hostname === 'localhost'
   ? 'http://localhost:5173'
   : 'https://glaze-lab-six.vercel.app'
-
 const SCOPES = [
   'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/userinfo.profile',
   'https://www.googleapis.com/auth/userinfo.email'
 ].join(' ')
+
+const IS_DESKTOP = window.innerWidth >= 100
 
 function App() {
   const [isSignedIn, setIsSignedIn] = useState(false)
@@ -19,6 +25,18 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [currentScreen, setCurrentScreen] = useState('recipes')
   const [accessToken, setAccessToken] = useState(null)
+  const [showNewRecipe, setShowNewRecipe] = useState(false)
+  const [recipes, setRecipes] = useState([])
+  const [recipesLoading, setRecipesLoading] = useState(false)
+  const [vaultFolders, setVaultFolders] = useState(null)
+  const [statusMessage, setStatusMessage] = useState('')
+  const [isDesktop, setIsDesktop] = useState(IS_DESKTOP)
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 768)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   useEffect(() => {
     const hash = window.location.hash
@@ -52,13 +70,97 @@ function App() {
         setUserName(data.given_name || data.email)
         setAccessToken(token)
         setIsSignedIn(true)
+        initVault(token)
       } else {
         localStorage.removeItem('google_access_token')
+        setLoading(false)
       }
     } catch (error) {
       localStorage.removeItem('google_access_token')
+      setLoading(false)
     }
-    setLoading(false)
+  }
+
+  const initVault = async (token) => {
+    try {
+      setStatusMessage('Setting up vault...')
+      const folders = await ensureVaultStructure(token)
+      setVaultFolders(folders)
+      setStatusMessage('Loading recipes...')
+      await loadRecipes(token, folders.recipes)
+      setStatusMessage('')
+    } catch (error) {
+      console.error('Vault init error:', error)
+      setStatusMessage('Error connecting to Drive')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadRecipes = async (token, folderId) => {
+    setRecipesLoading(true)
+    try {
+      const files = await listFiles(token, folderId)
+      const loaded = await Promise.all(
+        files.map(async (file) => {
+          try {
+            const content = await readFile(token, file.id)
+            return markdownToRecipe(content, file.id)
+          } catch (e) {
+            return null
+          }
+        })
+      )
+      setRecipes(loaded.filter(Boolean))
+    } catch (error) {
+      console.error('Failed to load recipes:', error)
+    } finally {
+      setRecipesLoading(false)
+    }
+  }
+
+  const handleSaveRecipe = async (recipeData) => {
+    if (!accessToken || !vaultFolders) { alert('Not connected to Drive'); return }
+    const newRecipe = {
+      ...recipeData,
+      id: Date.now().toString(),
+      created: new Date().toISOString().split('T')[0],
+      favourite: false,
+      testCount: 0
+    }
+    const slug = newRecipe.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    const filename = `${slug}.md`
+    const content = recipeToMarkdown(newRecipe)
+    try {
+      setStatusMessage('Saving...')
+      const existing = await findFile(accessToken, vaultFolders.recipes, filename)
+      if (existing) {
+        await updateFile(accessToken, existing.id, content)
+        newRecipe.fileId = existing.id
+      } else {
+        const created = await createFile(accessToken, vaultFolders.recipes, filename, content)
+        newRecipe.fileId = created.id
+      }
+      setRecipes(prev => [newRecipe, ...prev.filter(r => r.name !== newRecipe.name)])
+      setShowNewRecipe(false)
+      setStatusMessage('Saved ✓')
+      setTimeout(() => setStatusMessage(''), 2000)
+    } catch (error) {
+      console.error('Save error:', error)
+      setStatusMessage('Save failed')
+      setTimeout(() => setStatusMessage(''), 3000)
+    }
+  }
+
+  const handleToggleFavourite = async (recipeId) => {
+    setRecipes(prev => prev.map(r =>
+      r.id === recipeId ? { ...r, favourite: !r.favourite } : r
+    ))
+  }
+
+  const handleNavigate = (screen) => {
+    setCurrentScreen(screen)
+    setShowNewRecipe(false)
   }
 
   const handleSignIn = () => {
@@ -76,6 +178,8 @@ function App() {
     setIsSignedIn(false)
     setUserName('')
     setAccessToken(null)
+    setVaultFolders(null)
+    setRecipes([])
   }
 
   if (loading) {
@@ -84,7 +188,7 @@ function App() {
         <div className="login-screen">
           <div className="login-card">
             <h1>Glaze Lab</h1>
-            <p>Loading...</p>
+            <p>{statusMessage || 'Loading...'}</p>
           </div>
         </div>
       </div>
@@ -107,44 +211,60 @@ function App() {
     )
   }
 
+  const renderScreen = () => {
+    if (currentScreen === 'recipes') {
+      if (showNewRecipe) {
+        return (
+          <RecipeForm
+            onSave={handleSaveRecipe}
+            onCancel={() => setShowNewRecipe(false)}
+          />
+        )
+      }
+      return (
+        <RecipeLibrary
+          recipes={recipes}
+          onNewRecipe={() => setShowNewRecipe(true)}
+          onSelectRecipe={(recipe) => console.log('Selected:', recipe.name)}
+          onToggleFavourite={handleToggleFavourite}
+        />
+      )
+    }
+    if (currentScreen === 'more') return <MoreScreen onNavigate={handleNavigate} />
+    return (
+      <div className="placeholder-screen">
+        <p>{currentScreen.charAt(0).toUpperCase() + currentScreen.slice(1).replace('-', ' ')} coming soon</p>
+      </div>
+    )
+  }
+
   return (
-    <div className="app">
-      <div className="screen-container">
-        <div className="screen-header">
-          <h1>Glaze Lab</h1>
-          <button onClick={handleSignOut} className="signout-btn">
-            Sign out
-          </button>
-        </div>
+    <div className={`app ${isDesktop ? 'desktop' : 'mobile'}`}>
+      {isDesktop && (
+        <Sidebar
+          currentScreen={currentScreen}
+          onNavigate={handleNavigate}
+          userName={userName}
+          onSignOut={handleSignOut}
+        />
+      )}
+      <div className={`main-content ${isDesktop ? 'with-sidebar' : 'with-bottom-nav'}`}>
+        {!isDesktop && (
+          <div className="mobile-header">
+            <h1>Glaze Lab</h1>
+            {statusMessage && <span className="status-msg">{statusMessage}</span>}
+          </div>
+        )}
+        {isDesktop && statusMessage && (
+          <div className="desktop-status">{statusMessage}</div>
+        )}
         <div className="screen-content">
-          {currentScreen === 'recipes' && (
-            <div className="placeholder-screen">
-              <p>Recipes coming next</p>
-            </div>
-          )}
-          {currentScreen === 'tests' && (
-            <div className="placeholder-screen">
-              <p>Test Results coming soon</p>
-            </div>
-          )}
-          {currentScreen === 'mix' && (
-            <div className="placeholder-screen">
-              <p>Mixing Sessions coming soon</p>
-            </div>
-          )}
-          {currentScreen === 'firings' && (
-            <div className="placeholder-screen">
-              <p>Firings coming soon</p>
-            </div>
-          )}
-          {currentScreen === 'search' && (
-            <div className="placeholder-screen">
-              <p>Search coming soon</p>
-            </div>
-          )}
+          {renderScreen()}
         </div>
       </div>
-      <Navigation currentScreen={currentScreen} onNavigate={setCurrentScreen} />
+      {!isDesktop && (
+        <BottomNav currentScreen={currentScreen} onNavigate={handleNavigate} />
+      )}
     </div>
   )
 }
