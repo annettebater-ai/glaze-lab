@@ -1,10 +1,30 @@
 import { useState, useEffect } from 'react'
-import Sidebar from './Sidebar'
-import BottomNav from './BottomNav'
-import MoreScreen from './MoreScreen'
-import RecipeLibrary from './RecipeLibrary'
+import {
+  Frame,
+  Navigation,
+  TopBar,
+  Page,
+  Text,
+  Button,
+  InlineStack,
+  Spinner,
+  Card,
+  BlockStack,
+} from '@shopify/polaris'
+import RecipeTable from './RecipeTable'
 import RecipeForm from './RecipeForm'
-import { ensureVaultStructure, listFiles, readFile, createFile, findFile, updateFile, recipeToMarkdown, markdownToRecipe } from './drive'
+import RecipeDetail from './RecipeDetail'
+import MixingSession from './MixingSession'
+import {
+  ensureVaultStructure,
+  listFiles,
+  readFile,
+  createFile,
+  findFile,
+  updateFile,
+  recipeToMarkdown,
+  markdownToRecipe
+} from './drive'
 import './App.css'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
@@ -17,8 +37,6 @@ const SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email'
 ].join(' ')
 
-const IS_DESKTOP = window.innerWidth >= 100
-
 function App() {
   const [isSignedIn, setIsSignedIn] = useState(false)
   const [userName, setUserName] = useState('')
@@ -26,17 +44,13 @@ function App() {
   const [currentScreen, setCurrentScreen] = useState('recipes')
   const [accessToken, setAccessToken] = useState(null)
   const [showNewRecipe, setShowNewRecipe] = useState(false)
+  const [editingRecipe, setEditingRecipe] = useState(null)
   const [recipes, setRecipes] = useState([])
-  const [recipesLoading, setRecipesLoading] = useState(false)
   const [vaultFolders, setVaultFolders] = useState(null)
   const [statusMessage, setStatusMessage] = useState('')
-  const [isDesktop, setIsDesktop] = useState(IS_DESKTOP)
-
-  useEffect(() => {
-    const handleResize = () => setIsDesktop(window.innerWidth >= 768)
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
+  const [selectedRecipe, setSelectedRecipe] = useState(null)
+  const [mixingRecipe, setMixingRecipe] = useState(null)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   useEffect(() => {
     const hash = window.location.hash
@@ -98,7 +112,6 @@ function App() {
   }
 
   const loadRecipes = async (token, folderId) => {
-    setRecipesLoading(true)
     try {
       const files = await listFiles(token, folderId)
       const loaded = await Promise.all(
@@ -114,22 +127,22 @@ function App() {
       setRecipes(loaded.filter(Boolean))
     } catch (error) {
       console.error('Failed to load recipes:', error)
-    } finally {
-      setRecipesLoading(false)
     }
   }
 
   const handleSaveRecipe = async (recipeData) => {
     if (!accessToken || !vaultFolders) { alert('Not connected to Drive'); return }
+    const isEdit = !!editingRecipe
     const newRecipe = {
       ...recipeData,
-      id: Date.now().toString(),
-      created: new Date().toISOString().split('T')[0],
-      favourite: false,
-      testCount: 0
+      id: isEdit ? editingRecipe.id : Date.now().toString(),
+      fileId: isEdit ? editingRecipe.fileId : undefined,
+      created: isEdit ? editingRecipe.created : new Date().toISOString().split('T')[0],
+      favourite: isEdit ? editingRecipe.favourite : false,
+      testCount: isEdit ? editingRecipe.testCount : 0
     }
     const slug = newRecipe.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-    const filename = `${slug}.md`
+    const filename = slug + '.md'
     const content = recipeToMarkdown(newRecipe)
     try {
       setStatusMessage('Saving...')
@@ -141,9 +154,10 @@ function App() {
         const created = await createFile(accessToken, vaultFolders.recipes, filename, content)
         newRecipe.fileId = created.id
       }
-      setRecipes(prev => [newRecipe, ...prev.filter(r => r.name !== newRecipe.name)])
+      setRecipes(prev => [newRecipe, ...prev.filter(r => r.id !== newRecipe.id)])
       setShowNewRecipe(false)
-      setStatusMessage('Saved ✓')
+      setEditingRecipe(null)
+      setStatusMessage('Saved')
       setTimeout(() => setStatusMessage(''), 2000)
     } catch (error) {
       console.error('Save error:', error)
@@ -152,24 +166,52 @@ function App() {
     }
   }
 
-  const handleToggleFavourite = async (recipeId) => {
+  const handleToggleFavourite = (recipeId) => {
     setRecipes(prev => prev.map(r =>
       r.id === recipeId ? { ...r, favourite: !r.favourite } : r
     ))
   }
 
+  const handleDeleteRecipe = async (recipe) => {
+    if (recipe.fileId && accessToken) {
+      try {
+        await fetch(
+          `https://www.googleapis.com/drive/v3/files/${recipe.fileId}`,
+          {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${accessToken}` }
+          }
+        )
+      } catch (e) {
+        console.error('Delete from Drive failed:', e)
+      }
+    }
+    setRecipes(prev => prev.filter(r => r.id !== recipe.id))
+    setSelectedRecipe(null)
+  }
+
+  const handleEditRecipe = (recipe) => {
+    setEditingRecipe(recipe)
+    setShowNewRecipe(true)
+    setSelectedRecipe(null)
+  }
+
   const handleNavigate = (screen) => {
     setCurrentScreen(screen)
     setShowNewRecipe(false)
+    setEditingRecipe(null)
+    setSelectedRecipe(null)
+    setMixingRecipe(null)
+    setMobileNavOpen(false)
   }
 
   const handleSignIn = () => {
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-      `client_id=${GOOGLE_CLIENT_ID}` +
-      `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-      `&response_type=token` +
-      `&scope=${encodeURIComponent(SCOPES)}` +
-      `&prompt=consent`
+    const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' +
+      'client_id=' + GOOGLE_CLIENT_ID +
+      '&redirect_uri=' + encodeURIComponent(REDIRECT_URI) +
+      '&response_type=token' +
+      '&scope=' + encodeURIComponent(SCOPES) +
+      '&prompt=consent'
     window.location.href = authUrl
   }
 
@@ -180,16 +222,20 @@ function App() {
     setAccessToken(null)
     setVaultFolders(null)
     setRecipes([])
+    setSelectedRecipe(null)
+    setMixingRecipe(null)
+    setEditingRecipe(null)
   }
 
   if (loading) {
     return (
-      <div className="app">
-        <div className="login-screen">
-          <div className="login-card">
-            <h1>Glaze Lab</h1>
-            <p>{statusMessage || 'Loading...'}</p>
-          </div>
+      <div className="loading-screen">
+        <div className="loading-card">
+          <BlockStack gap="400" inlineAlign="center">
+            <Text variant="headingXl" as="h1">Glaze Notes</Text>
+            <Spinner size="small" />
+            <Text variant="bodyMd" tone="subdued">{statusMessage || 'Loading...'}</Text>
+          </BlockStack>
         </div>
       </div>
     )
@@ -197,75 +243,215 @@ function App() {
 
   if (!isSignedIn) {
     return (
-      <div className="app">
-        <div className="login-screen">
-          <div className="login-card">
-            <h1>Glaze Lab</h1>
-            <p>Your personal glaze chemistry studio</p>
-            <button onClick={handleSignIn} className="google-btn">
+      <div className="login-screen">
+        <div className="login-card">
+          <BlockStack gap="400" inlineAlign="center">
+            <Text variant="headingXl" as="h1">Glaze Notes</Text>
+            <Text variant="bodyMd" tone="subdued">Your personal glaze chemistry studio</Text>
+            <Button variant="primary" size="large" onClick={handleSignIn}>
               Sign in with Google
-            </button>
-          </div>
+            </Button>
+          </BlockStack>
         </div>
       </div>
     )
   }
 
+  const navigationMarkup = (
+    <Navigation location="/">
+      <div style={{
+        padding: '16px 16px 12px',
+        borderBottom: '1px solid #e3e3e3',
+        marginBottom: '4px'
+      }}>
+        <Text variant="headingMd" as="p" fontWeight="bold">Glaze Notes</Text>
+        <Text variant="bodySm" tone="subdued">{userName}</Text>
+      </div>
+      <Navigation.Section
+        items={[
+          {
+            label: 'Recipes',
+            selected: currentScreen === 'recipes',
+            onClick: () => handleNavigate('recipes'),
+          },
+          {
+            label: 'Mix',
+            selected: currentScreen === 'mix',
+            onClick: () => handleNavigate('mix'),
+          },
+          {
+            label: 'Tests',
+            selected: currentScreen === 'tests',
+            onClick: () => handleNavigate('tests'),
+          },
+        ]}
+      />
+      <Navigation.Section
+        title="Library"
+        items={[
+          {
+            label: 'Clay Bodies',
+            selected: currentScreen === 'clay-bodies',
+            onClick: () => handleNavigate('clay-bodies'),
+          },
+          {
+            label: 'Materials',
+            selected: currentScreen === 'materials',
+            onClick: () => handleNavigate('materials'),
+          },
+        ]}
+      />
+      <Navigation.Section
+        title="Account"
+        items={[
+          {
+            label: 'Search',
+            selected: currentScreen === 'search',
+            onClick: () => handleNavigate('search'),
+          },
+          {
+            label: 'Settings',
+            selected: currentScreen === 'settings',
+            onClick: () => handleNavigate('settings'),
+          },
+          {
+            label: 'Sign out',
+            onClick: handleSignOut,
+          },
+        ]}
+      />
+    </Navigation>
+  )
+
+  const topBarMarkup = (
+    <TopBar
+      showNavigationToggle
+      onNavigationToggle={() => setMobileNavOpen(!mobileNavOpen)}
+    />
+  )
+
   const renderScreen = () => {
-    if (currentScreen === 'recipes') {
-      if (showNewRecipe) {
-        return (
-          <RecipeForm
-            onSave={handleSaveRecipe}
-            onCancel={() => setShowNewRecipe(false)}
-          />
-        )
-      }
+    if (mixingRecipe) {
       return (
-        <RecipeLibrary
-          recipes={recipes}
-          onNewRecipe={() => setShowNewRecipe(true)}
-          onSelectRecipe={(recipe) => console.log('Selected:', recipe.name)}
-          onToggleFavourite={handleToggleFavourite}
+        <MixingSession
+          recipe={mixingRecipe}
+          onComplete={(sessionData) => {
+            console.log('Session complete:', sessionData)
+            setMixingRecipe(null)
+            setSelectedRecipe(null)
+          }}
+          onCancel={() => setMixingRecipe(null)}
         />
       )
     }
-    if (currentScreen === 'more') return <MoreScreen onNavigate={handleNavigate} />
+
+    if (currentScreen === 'recipes') {
+      if (showNewRecipe) {
+        return (
+          <Page
+            title={editingRecipe ? 'Edit Recipe' : 'New Recipe'}
+            backAction={{
+              content: 'Recipes',
+              onAction: () => {
+                setShowNewRecipe(false)
+                setEditingRecipe(null)
+              }
+            }}
+          >
+            <RecipeForm
+              recipe={editingRecipe}
+              onSave={handleSaveRecipe}
+              onCancel={() => {
+                setShowNewRecipe(false)
+                setEditingRecipe(null)
+              }}
+            />
+          </Page>
+        )
+      }
+      if (selectedRecipe) {
+        return (
+          <Page
+            title={selectedRecipe.name}
+            backAction={{ content: 'Recipes', onAction: () => setSelectedRecipe(null) }}
+            primaryAction={{
+              content: 'Start Mixing',
+              onAction: () => setMixingRecipe(selectedRecipe)
+            }}
+            secondaryActions={[
+              {
+                content: 'Edit',
+                onAction: () => handleEditRecipe(selectedRecipe)
+              }
+            ]}
+          >
+            <RecipeDetail
+              recipe={selectedRecipe}
+              onBack={() => setSelectedRecipe(null)}
+              onStartMix={(recipe) => setMixingRecipe(recipe)}
+              onDelete={handleDeleteRecipe}
+            />
+          </Page>
+        )
+      }
+      return (
+        <Page
+          title="My Recipes"
+          primaryAction={{
+            content: 'New Recipe',
+            onAction: () => {
+              setEditingRecipe(null)
+              setShowNewRecipe(true)
+            }
+          }}
+        >
+          <BlockStack gap="400">
+            {statusMessage ? (
+              <InlineStack gap="200" align="center">
+                <Spinner size="small" />
+                <Text tone="subdued">{statusMessage}</Text>
+              </InlineStack>
+            ) : null}
+            <RecipeTable
+              recipes={recipes}
+              onSelectRecipe={(recipe) => setSelectedRecipe(recipe)}
+              onToggleFavourite={handleToggleFavourite}
+              onDeleteRecipe={handleDeleteRecipe}
+              onEditRecipe={handleEditRecipe}
+            />
+          </BlockStack>
+        </Page>
+      )
+    }
+
+    if (currentScreen === 'mix') {
+      return (
+        <Page title="Mix">
+          <Card>
+            <Text tone="subdued">Select a recipe and tap Start Mixing to begin a session.</Text>
+          </Card>
+        </Page>
+      )
+    }
+
     return (
-      <div className="placeholder-screen">
-        <p>{currentScreen.charAt(0).toUpperCase() + currentScreen.slice(1).replace('-', ' ')} coming soon</p>
-      </div>
+      <Page title={currentScreen.charAt(0).toUpperCase() + currentScreen.slice(1).replace('-', ' ')}>
+        <Card>
+          <Text tone="subdued">Coming soon</Text>
+        </Card>
+      </Page>
     )
   }
 
   return (
-    <div className={`app ${isDesktop ? 'desktop' : 'mobile'}`}>
-      {isDesktop && (
-        <Sidebar
-          currentScreen={currentScreen}
-          onNavigate={handleNavigate}
-          userName={userName}
-          onSignOut={handleSignOut}
-        />
-      )}
-      <div className={`main-content ${isDesktop ? 'with-sidebar' : 'with-bottom-nav'}`}>
-        {!isDesktop && (
-          <div className="mobile-header">
-            <h1>Glaze Lab</h1>
-            {statusMessage && <span className="status-msg">{statusMessage}</span>}
-          </div>
-        )}
-        {isDesktop && statusMessage && (
-          <div className="desktop-status">{statusMessage}</div>
-        )}
-        <div className="screen-content">
-          {renderScreen()}
-        </div>
-      </div>
-      {!isDesktop && (
-        <BottomNav currentScreen={currentScreen} onNavigate={handleNavigate} />
-      )}
-    </div>
+    <Frame
+      navigation={navigationMarkup}
+      topBar={topBarMarkup}
+      showMobileNavigation={mobileNavOpen}
+      onNavigationDismiss={() => setMobileNavOpen(false)}
+    >
+      {renderScreen()}
+    </Frame>
   )
 }
 

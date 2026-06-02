@@ -129,3 +129,45 @@ body {
   font-size: 15px;
   line-height: 2;
 }
+.screen-title-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  background: white;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.screen-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.new-recipe-btn {
+  padding: 9px 18px;
+  background: #1a3a5c;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+.Polaris-TopBar {
+  min-height: 56px !important;
+  height: 56px !important;
+}
+
+.Polaris-TopBar__Contents {
+  display: flex !important;
+  align-items: center !important;
+  height: 56px !important;
+  padding: 0 !important;
+}
+
+.Polaris-TopBar__NavigationIcon {
+  display: flex !important;
+  align-items: center !important;
+  height: 56px !important;
+  padding: 0 12px !important;
+}

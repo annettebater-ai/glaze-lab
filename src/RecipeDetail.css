@@ -1,0 +1,230 @@
+.recipe-detail {
+  padding-bottom: 40px;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: white;
+  border-bottom: 1px solid #e8e8e8;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: #2d6a9f;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 0;
+}
+
+.mix-btn {
+  padding: 8px 16px;
+  background: #1a3a5c;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.detail-title-block {
+  padding: 20px 20px 16px;
+  background: white;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.detail-type {
+  font-size: 11px;
+  font-weight: 600;
+  color: #2d6a9f;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.detail-name {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 8px;
+}
+
+.detail-meta {
+  font-size: 14px;
+  color: #888;
+}
+
+.detail-status {
+  font-weight: 600;
+}
+
+.detail-status.testing { color: #856404; }
+.detail-status.stable { color: #155724; }
+.detail-status.retired { color: #888; }
+
+.detail-section {
+  padding: 20px;
+  border-bottom: 1px solid #f0f0f0;
+  background: white;
+  margin-bottom: 8px;
+}
+
+.section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a3a5c;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 14px;
+}
+
+.chemistry-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.chem-card {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 12px 14px;
+  border: 1px solid #e8e8e8;
+}
+
+.chem-label {
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 4px;
+}
+
+.chem-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.ingredient-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ing-th {
+  padding: 8px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border-bottom: 1px solid #f0f0f0;
+  text-align: left;
+}
+
+.ing-th-right {
+  text-align: right;
+}
+
+.ing-row {
+  border-bottom: 1px solid #f8f8f8;
+}
+
+.ing-td {
+  padding: 10px 0;
+  font-size: 15px;
+  color: #1a1a1a;
+}
+
+.ing-td-right {
+  text-align: right;
+  color: #2d6a9f;
+  font-weight: 600;
+}
+
+.umf-grid {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 16px;
+}
+
+.umf-col {
+  flex: 1;
+}
+
+.umf-group-label {
+  font-size: 11px;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 8px;
+}
+
+.umf-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.umf-oxide {
+  font-size: 13px;
+  color: #555;
+}
+
+.umf-val {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a3a5c;
+}
+
+.stull-toggle-btn {
+  width: 100%;
+  padding: 10px;
+  background: white;
+  border: 1px solid #2d6a9f;
+  border-radius: 8px;
+  color: #2d6a9f;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.stull-placeholder {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f0f4f8;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #555;
+  text-align: center;
+}
+
+.detail-notes {
+  font-size: 15px;
+  color: #555;
+  line-height: 1.6;
+}
+
+.detail-mix-footer {
+  padding: 20px;
+}
+
+.mix-btn-large {
+  width: 100%;
+  padding: 16px;
+  background: #1a3a5c;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+}
