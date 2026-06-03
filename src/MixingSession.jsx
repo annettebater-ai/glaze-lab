@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import SubstitutionAssistant from './SubstitutionAssistant'
 import './MixingSession.css'
 
 const UNITS = ['g', 'kg', 'lb', 'oz']
@@ -81,7 +82,7 @@ export default function MixingSession({ recipe, onComplete, onCancel }) {
         />
       </div>
 
-      {/* Batch size — sits above checklist */}
+      {/* Batch size */}
       <div className="mix-batch-bar">
         <div className="mix-batch-label">Batch size</div>
         <div className="mix-batch-controls">
@@ -102,7 +103,7 @@ export default function MixingSession({ recipe, onComplete, onCancel }) {
             ))}
           </div>
           {batchGrams > 0 && unit !== 'g' && (
-            <div className="mix-batch-converted">{batchGrams.toFixed(0)}g</div>
+            <div className="mix-batch-converted">{batchGrams.toFixed(0)}g total</div>
           )}
         </div>
       </div>
@@ -222,6 +223,12 @@ export default function MixingSession({ recipe, onComplete, onCancel }) {
           {allDone ? 'Complete Session' : `${totalCount - checkedCount} remaining`}
         </button>
       </div>
+
+      {/* Substitution Assistant */}
+      <SubstitutionAssistant
+        recipe={recipe}
+        checkedIngredients={checked}
+      />
 
     </div>
   )

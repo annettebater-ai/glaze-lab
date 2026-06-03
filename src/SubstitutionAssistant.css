@@ -28,10 +28,6 @@
   color: #c8a96e;
 }
 
-.sa-trigger-label {
-  color: white;
-}
-
 /* Overlay */
 .sa-overlay {
   position: fixed;
@@ -46,13 +42,12 @@
 .sa-panel {
   width: 100%;
   max-height: 85vh;
-  background: #ffffff;
+  background: white;
   border-radius: 20px 20px 0 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   animation: slideUp 0.25s ease;
-  color: #1a1a1a;
 }
 
 @keyframes slideUp {
@@ -60,14 +55,13 @@
   to { transform: translateY(0); }
 }
 
-/* Panel header — dark Sidekick style */
 .sa-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px 12px;
   background: #1a1a1a;
-  color: #ffffff;
+  color: white;
   flex-shrink: 0;
 }
 
@@ -77,7 +71,6 @@
   gap: 10px;
   font-size: 15px;
   font-weight: 700;
-  color: #ffffff;
 }
 
 .sa-header-icon {
@@ -95,17 +88,16 @@
   line-height: 1;
 }
 
-/* Context bar */
 .sa-panel-context {
   padding: 8px 20px;
   background: #f5f5f5;
   font-size: 12px;
-  color: #666666;
+  color: #888;
   border-bottom: 1px solid #e8e8e8;
   flex-shrink: 0;
 }
 
-/* Messages area */
+/* Messages */
 .sa-messages {
   flex: 1;
   overflow-y: auto;
@@ -113,7 +105,6 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: #ffffff;
 }
 
 .sa-msg {
@@ -150,23 +141,14 @@
 
 .sa-bubble-user {
   background: #1a3a5c;
-  color: #ffffff;
+  color: white;
   border-radius: 14px 14px 4px 14px;
 }
 
 .sa-bubble-assistant {
-  background: #f0f0f0;
+  background: #f5f5f5;
   color: #1a1a1a;
   border-radius: 14px 14px 14px 4px;
-}
-
-.sa-bubble-assistant p {
-  color: #1a1a1a;
-  margin: 0 0 6px;
-}
-
-.sa-bubble-assistant p:last-child {
-  margin-bottom: 0;
 }
 
 .sa-bubble-error {
@@ -179,12 +161,11 @@
   margin-top: 8px;
   padding-left: 16px;
   font-size: 13px;
-  color: #444444;
+  color: #555;
 }
 
 .sa-tips li {
   margin-bottom: 4px;
-  color: #444444;
 }
 
 /* Substitution card */
@@ -194,7 +175,6 @@
   padding: 14px;
   max-width: 90%;
   border: 1px solid #e8e8e8;
-  color: #1a1a1a;
 }
 
 .sa-sub-title {
@@ -207,7 +187,7 @@
 }
 
 .sa-sub-option {
-  background: #ffffff;
+  background: white;
   border-radius: 8px;
   padding: 10px 12px;
   margin-bottom: 8px;
@@ -236,7 +216,7 @@
   font-size: 10px;
   font-weight: 700;
   background: #1a7a1a;
-  color: #ffffff;
+  color: white;
   padding: 2px 8px;
   border-radius: 10px;
   text-transform: uppercase;
@@ -252,7 +232,7 @@
 
 .sa-sub-notes {
   font-size: 12px;
-  color: #555555;
+  color: #666;
 }
 
 .sa-sub-impact {
@@ -260,7 +240,7 @@
   padding-top: 10px;
   border-top: 1px solid #e8e8e8;
   font-size: 12px;
-  color: #444444;
+  color: #555;
 }
 
 .sa-impact-label {
@@ -280,7 +260,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #aaaaaa;
+  background: #aaa;
   animation: dotPulse 1.2s infinite;
 }
 
@@ -300,7 +280,7 @@
   padding: 12px 16px;
   padding-bottom: calc(12px + env(safe-area-inset-bottom));
   border-top: 1px solid #e8e8e8;
-  background: #ffffff;
+  background: white;
   flex-shrink: 0;
 }
 
@@ -311,7 +291,6 @@
   border-radius: 12px;
   font-size: 14px;
   color: #1a1a1a;
-  background: #ffffff;
   resize: none;
   font-family: inherit;
   line-height: 1.4;
@@ -320,11 +299,6 @@
 .sa-input:focus {
   outline: none;
   border-color: #1a3a5c;
-  background: #ffffff;
-}
-
-.sa-input::placeholder {
-  color: #aaaaaa;
 }
 
 .sa-send {
@@ -333,7 +307,7 @@
   border-radius: 50%;
   background: #c9cccf;
   border: none;
-  color: #ffffff;
+  color: white;
   font-size: 18px;
   cursor: not-allowed;
   display: flex;

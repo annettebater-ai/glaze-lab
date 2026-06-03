@@ -1,8 +1,5 @@
 import { useState, useEffect } from 'react'
 import {
-  Frame,
-  Navigation,
-  TopBar,
   Page,
   Text,
   Button,
@@ -37,9 +34,41 @@ const SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email'
 ].join(' ')
 
+const GlazeNotesLogo = () => (
+  <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+    <rect x="5" y="12" width="18" height="13" rx="2" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5"/>
+    <rect x="10" y="17" width="8" height="8" rx="1" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.4)" strokeWidth="1"/>
+    <path d="M14 11 C14 11 11 8 12 5 C12 5 13 7 14 6 C14 6 15 4 16 5 C17 7 14 11 14 11Z" fill="#c8a96e"/>
+    <path d="M14 10 C14 10 12.5 8.5 13 7 C13.5 8 14 7.5 14 7.5 C14 7.5 14.5 8 15 7 C15.5 8.5 14 10 14 10Z" fill="#f0c878"/>
+    <line x1="12" y1="20" x2="16" y2="20" stroke="rgba(255,255,255,0.4)" strokeWidth="1" strokeLinecap="round"/>
+    <line x1="12" y1="22" x2="15" y2="22" stroke="rgba(255,255,255,0.4)" strokeWidth="1" strokeLinecap="round"/>
+  </svg>
+)
+
+const BurgerIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+    <path d="M2 5h16M2 10h16M2 15h16" stroke="rgba(255,255,255,0.8)" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+)
+
+const SearchIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
+    <circle cx="9" cy="9" r="7" stroke="rgba(255,255,255,0.6)" strokeWidth="2"/>
+    <path d="M15 15l3 3" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round"/>
+  </svg>
+)
+
+const NAV_ITEMS = [
+  { id: 'recipes', label: 'Recipes' },
+  { id: 'tests', label: 'Tests' },
+  { id: 'clay-bodies', label: 'Clay Bodies' },
+  { id: 'materials', label: 'Materials' },
+]
+
 function App() {
   const [isSignedIn, setIsSignedIn] = useState(false)
   const [userName, setUserName] = useState('')
+  const [userEmail, setUserEmail] = useState('')
   const [loading, setLoading] = useState(true)
   const [currentScreen, setCurrentScreen] = useState('recipes')
   const [accessToken, setAccessToken] = useState(null)
@@ -50,7 +79,8 @@ function App() {
   const [statusMessage, setStatusMessage] = useState('')
   const [selectedRecipe, setSelectedRecipe] = useState(null)
   const [mixingRecipe, setMixingRecipe] = useState(null)
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [navOpen, setNavOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   useEffect(() => {
     const hash = window.location.hash
@@ -82,6 +112,7 @@ function App() {
       const data = await response.json()
       if (response.ok) {
         setUserName(data.given_name || data.email)
+        setUserEmail(data.email || '')
         setAccessToken(token)
         setIsSignedIn(true)
         initVault(token)
@@ -177,10 +208,7 @@ function App() {
       try {
         await fetch(
           `https://www.googleapis.com/drive/v3/files/${recipe.fileId}`,
-          {
-            method: 'DELETE',
-            headers: { Authorization: `Bearer ${accessToken}` }
-          }
+          { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } }
         )
       } catch (e) {
         console.error('Delete from Drive failed:', e)
@@ -202,7 +230,8 @@ function App() {
     setEditingRecipe(null)
     setSelectedRecipe(null)
     setMixingRecipe(null)
-    setMobileNavOpen(false)
+    setNavOpen(false)
+    setUserMenuOpen(false)
   }
 
   const handleSignIn = () => {
@@ -219,12 +248,15 @@ function App() {
     localStorage.removeItem('google_access_token')
     setIsSignedIn(false)
     setUserName('')
+    setUserEmail('')
     setAccessToken(null)
     setVaultFolders(null)
     setRecipes([])
     setSelectedRecipe(null)
     setMixingRecipe(null)
     setEditingRecipe(null)
+    setNavOpen(false)
+    setUserMenuOpen(false)
   }
 
   if (loading) {
@@ -257,78 +289,7 @@ function App() {
     )
   }
 
-  const navigationMarkup = (
-    <Navigation location="/">
-      <div style={{
-        padding: '16px 16px 12px',
-        borderBottom: '1px solid #e3e3e3',
-        marginBottom: '4px'
-      }}>
-        <Text variant="headingMd" as="p" fontWeight="bold">Glaze Notes</Text>
-        <Text variant="bodySm" tone="subdued">{userName}</Text>
-      </div>
-      <Navigation.Section
-        items={[
-          {
-            label: 'Recipes',
-            selected: currentScreen === 'recipes',
-            onClick: () => handleNavigate('recipes'),
-          },
-          {
-            label: 'Mix',
-            selected: currentScreen === 'mix',
-            onClick: () => handleNavigate('mix'),
-          },
-          {
-            label: 'Tests',
-            selected: currentScreen === 'tests',
-            onClick: () => handleNavigate('tests'),
-          },
-        ]}
-      />
-      <Navigation.Section
-        title="Library"
-        items={[
-          {
-            label: 'Clay Bodies',
-            selected: currentScreen === 'clay-bodies',
-            onClick: () => handleNavigate('clay-bodies'),
-          },
-          {
-            label: 'Materials',
-            selected: currentScreen === 'materials',
-            onClick: () => handleNavigate('materials'),
-          },
-        ]}
-      />
-      <Navigation.Section
-        title="Account"
-        items={[
-          {
-            label: 'Search',
-            selected: currentScreen === 'search',
-            onClick: () => handleNavigate('search'),
-          },
-          {
-            label: 'Settings',
-            selected: currentScreen === 'settings',
-            onClick: () => handleNavigate('settings'),
-          },
-          {
-            label: 'Sign out',
-            onClick: handleSignOut,
-          },
-        ]}
-      />
-    </Navigation>
-  )
-
-  const topBarMarkup = (
-    <TopBar
-      showNavigationToggle
-      onNavigationToggle={() => setMobileNavOpen(!mobileNavOpen)}
-    />
-  )
+  const userInitial = userName ? userName.charAt(0).toUpperCase() : '?'
 
   const renderScreen = () => {
     if (mixingRecipe) {
@@ -374,15 +335,8 @@ function App() {
           <Page
             title={selectedRecipe.name}
             backAction={{ content: 'Recipes', onAction: () => setSelectedRecipe(null) }}
-            primaryAction={{
-              content: 'Start Mixing',
-              onAction: () => setMixingRecipe(selectedRecipe)
-            }}
             secondaryActions={[
-              {
-                content: 'Edit',
-                onAction: () => handleEditRecipe(selectedRecipe)
-              }
+              { content: 'Edit', onAction: () => handleEditRecipe(selectedRecipe) }
             ]}
           >
             <RecipeDetail
@@ -424,16 +378,6 @@ function App() {
       )
     }
 
-    if (currentScreen === 'mix') {
-      return (
-        <Page title="Mix">
-          <Card>
-            <Text tone="subdued">Select a recipe and tap Start Mixing to begin a session.</Text>
-          </Card>
-        </Page>
-      )
-    }
-
     return (
       <Page title={currentScreen.charAt(0).toUpperCase() + currentScreen.slice(1).replace('-', ' ')}>
         <Card>
@@ -444,14 +388,77 @@ function App() {
   }
 
   return (
-    <Frame
-      navigation={navigationMarkup}
-      topBar={topBarMarkup}
-      showMobileNavigation={mobileNavOpen}
-      onNavigationDismiss={() => setMobileNavOpen(false)}
-    >
-      {renderScreen()}
-    </Frame>
+    <div className="app-shell">
+
+      {/* TopBar */}
+      <div className="app-topbar">
+        <button className="topbar-burger" onClick={() => setNavOpen(!navOpen)}>
+          <BurgerIcon />
+        </button>
+        <div className="topbar-logo">
+          <GlazeNotesLogo />
+          <span className="topbar-logo-text">Glaze Notes</span>
+        </div>
+        <div className="topbar-search">
+          <div className="topbar-search-field" onClick={() => handleNavigate('search')}>
+            <SearchIcon />
+            <input
+              type="text"
+              placeholder="Search recipes, materials..."
+              readOnly
+            />
+          </div>
+        </div>
+        <div className="topbar-right">
+          <div className="topbar-user" onClick={() => setUserMenuOpen(!userMenuOpen)}>
+            <div className="topbar-avatar">{userInitial}</div>
+            <span className="topbar-username">{userName}</span>
+            {userMenuOpen && (
+              <div className="user-menu-dropdown">
+                <div className="user-menu-name">{userName}</div>
+                <div className="user-menu-email">{userEmail}</div>
+                <div className="user-menu-divider" />
+                <button className="user-menu-item" onClick={handleSignOut}>Sign out</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Nav overlay + drawer */}
+      {navOpen && (
+        <>
+          <div className="nav-overlay" onClick={() => setNavOpen(false)} />
+          <div className="nav-drawer">
+            <div className="nav-items">
+              {NAV_ITEMS.map(item => (
+                <button
+                  key={item.id}
+                  className={`nav-item ${currentScreen === item.id ? 'active' : ''}`}
+                  onClick={() => handleNavigate(item.id)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <div className="nav-settings">
+              <button
+                className={`nav-item ${currentScreen === 'settings' ? 'active' : ''}`}
+                onClick={() => handleNavigate('settings')}
+              >
+                Settings
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Main content */}
+      <div className="app-main">
+        {renderScreen()}
+      </div>
+
+    </div>
   )
 }
 
