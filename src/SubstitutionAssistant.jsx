@@ -250,6 +250,9 @@ export default function SubstitutionAssistant({ recipe, checkedIngredients }) {
 
       const data = await response.json()
       const raw = data.content?.[0]?.text || ''
+      const raw = data.content?.[0]?.text || ''
+console.log('Raw response:', raw)
+console.log('Full data:', JSON.stringify(data))
 
       let parsed
       try {
