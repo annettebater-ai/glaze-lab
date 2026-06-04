@@ -249,23 +249,20 @@ export default function SubstitutionAssistant({ recipe, checkedIngredients }) {
       })
 
       const data = await response.json()
-      const raw = data.content?.[0]?.text || ''
-      const raw = data.content?.[0]?.text || ''
-console.log('Raw response:', raw)
-console.log('Full data:', JSON.stringify(data))
+      const rawText = data.content?.[0]?.text || ''
 
       let parsed
       try {
-        parsed = JSON.parse(raw)
+        parsed = JSON.parse(rawText)
       } catch {
-        parsed = { type: 'general', answer: raw, tips: [] }
+        parsed = { type: 'general', answer: rawText, tips: [] }
       }
 
       setMessages(prev => [...prev, {
         role: 'assistant',
         type: parsed.type,
         parsed,
-        raw
+        raw: rawText
       }])
     } catch (err) {
       console.error('API error:', err)
