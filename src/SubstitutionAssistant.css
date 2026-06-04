@@ -1,12 +1,12 @@
-/* Floating trigger button */
+/* ── Trigger button ── */
 .sa-trigger {
   position: fixed;
-  bottom: 80px;
-  right: 20px;
+  bottom: 24px;
+  right: 24px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 18px;
+  padding: 11px 18px;
   background: #1a1a1a;
   color: white;
   border: none;
@@ -28,7 +28,11 @@
   color: #c8a96e;
 }
 
-/* Overlay */
+.sa-trigger-label {
+  color: white;
+}
+
+/* ── Mobile overlay ── */
 .sa-overlay {
   position: fixed;
   inset: 0;
@@ -38,8 +42,8 @@
   align-items: flex-end;
 }
 
-/* Panel */
-.sa-panel {
+/* ── Mobile panel (slide up) ── */
+.sa-panel-mobile {
   width: 100%;
   max-height: 85vh;
   background: white;
@@ -48,6 +52,7 @@
   flex-direction: column;
   overflow: hidden;
   animation: slideUp 0.25s ease;
+  color: #1a1a1a;
 }
 
 @keyframes slideUp {
@@ -55,11 +60,34 @@
   to { transform: translateY(0); }
 }
 
+/* ── Desktop panel (docked right) ── */
+.sa-panel-desktop {
+  position: fixed;
+  top: 56px;
+  right: 0;
+  bottom: 0;
+  width: 360px;
+  background: white;
+  border-left: 1px solid #e3e3e3;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 150;
+  box-shadow: -4px 0 16px rgba(0,0,0,0.08);
+  animation: slideInRight 0.2s ease;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+/* ── Panel header ── */
 .sa-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px 12px;
+  padding: 14px 16px 12px;
   background: #1a1a1a;
   color: white;
   flex-shrink: 0;
@@ -69,13 +97,14 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
+  color: white;
 }
 
 .sa-header-icon {
   color: #c8a96e;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .sa-close {
@@ -88,8 +117,9 @@
   line-height: 1;
 }
 
+/* ── Context bar ── */
 .sa-panel-context {
-  padding: 8px 20px;
+  padding: 8px 16px;
   background: #f5f5f5;
   font-size: 12px;
   color: #888;
@@ -97,7 +127,7 @@
   flex-shrink: 0;
 }
 
-/* Messages */
+/* ── Messages ── */
 .sa-messages {
   flex: 1;
   overflow-y: auto;
@@ -105,6 +135,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  background: white;
 }
 
 .sa-msg {
@@ -118,13 +149,12 @@
 }
 
 .sa-avatar {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   background: #1a1a1a;
   color: #c8a96e;
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -132,7 +162,7 @@
 }
 
 .sa-bubble {
-  padding: 10px 14px;
+  padding: 9px 13px;
   border-radius: 14px;
   font-size: 14px;
   line-height: 1.5;
@@ -146,9 +176,18 @@
 }
 
 .sa-bubble-assistant {
-  background: #f5f5f5;
+  background: #f0f0f0;
   color: #1a1a1a;
   border-radius: 14px 14px 14px 4px;
+}
+
+.sa-bubble-assistant p {
+  color: #1a1a1a;
+  margin: 0 0 6px;
+}
+
+.sa-bubble-assistant p:last-child {
+  margin-bottom: 0;
 }
 
 .sa-bubble-error {
@@ -161,29 +200,31 @@
   margin-top: 8px;
   padding-left: 16px;
   font-size: 13px;
-  color: #555;
+  color: #444;
 }
 
 .sa-tips li {
   margin-bottom: 4px;
+  color: #444;
 }
 
-/* Substitution card */
+/* ── Substitution card ── */
 .sa-sub-card {
   background: #f8f8f8;
   border-radius: 12px;
-  padding: 14px;
-  max-width: 90%;
+  padding: 12px;
+  max-width: 95%;
   border: 1px solid #e8e8e8;
+  color: #1a1a1a;
 }
 
 .sa-sub-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: #1a3a5c;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .sa-sub-option {
@@ -240,7 +281,7 @@
   padding-top: 10px;
   border-top: 1px solid #e8e8e8;
   font-size: 12px;
-  color: #555;
+  color: #444;
 }
 
 .sa-impact-label {
@@ -248,12 +289,12 @@
   color: #1a1a1a;
 }
 
-/* Loading dots */
+/* ── Loading dots ── */
 .sa-loading {
   display: flex;
   gap: 4px;
   align-items: center;
-  padding: 12px 16px;
+  padding: 10px 13px;
 }
 
 .sa-dot {
@@ -272,12 +313,12 @@
   40% { opacity: 1; transform: scale(1); }
 }
 
-/* Input row */
+/* ── Input row ── */
 .sa-input-row {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: flex-end;
-  padding: 12px 16px;
+  padding: 12px;
   padding-bottom: calc(12px + env(safe-area-inset-bottom));
   border-top: 1px solid #e8e8e8;
   background: white;
@@ -286,11 +327,12 @@
 
 .sa-input {
   flex: 1;
-  padding: 10px 14px;
+  padding: 9px 12px;
   border: 1px solid #c9cccf;
-  border-radius: 12px;
+  border-radius: 10px;
   font-size: 14px;
   color: #1a1a1a;
+  background: white;
   resize: none;
   font-family: inherit;
   line-height: 1.4;
@@ -301,14 +343,18 @@
   border-color: #1a3a5c;
 }
 
+.sa-input::placeholder {
+  color: #aaa;
+}
+
 .sa-send {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   background: #c9cccf;
   border: none;
   color: white;
-  font-size: 18px;
+  font-size: 16px;
   cursor: not-allowed;
   display: flex;
   align-items: center;
@@ -320,4 +366,10 @@
 .sa-send.active {
   background: #1a3a5c;
   cursor: pointer;
+}
+
+/* ── Desktop content shift ── */
+.sidekick-open .app-main {
+  margin-right: 360px;
+  transition: margin-right 0.2s ease;
 }

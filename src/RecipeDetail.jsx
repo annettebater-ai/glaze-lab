@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { analyseRecipe } from './chemistry'
 import './RecipeDetail.css'
 
 const GLAZE_TYPE_COLORS = {
@@ -37,22 +36,17 @@ export default function RecipeDetail({ recipe, onBack, onStartMix }) {
   return (
     <div className="recipe-detail">
 
-      {/* Header */}
-      <div className="detail-header">
-        <button className="back-btn" onClick={onBack}>← Back</button>
-        <div className="detail-header-actions">
-          <button className="mix-btn" onClick={() => onStartMix(recipe)}>
-            ⚖️ Start Mixing
-          </button>
-        </div>
-      </div>
-
       {/* Title block */}
       <div className="detail-title-block">
-        <div className="detail-type">{recipe.recipeType}</div>
+        <div className="detail-type-row">
+          <div className="detail-type">{recipe.recipeType}</div>
+          <button className="detail-mix-btn" onClick={() => onStartMix(recipe)}>
+            Start Mixing
+          </button>
+        </div>
         <h1 className="detail-name">{recipe.name}</h1>
         <div className="detail-meta">
-          Cone {recipe.cone} · {recipe.atmosphere} · 
+          Cone {recipe.cone} · {recipe.atmosphere} ·
           <span className={`detail-status ${recipe.status}`}> {recipe.status}</span>
         </div>
       </div>
@@ -107,7 +101,7 @@ export default function RecipeDetail({ recipe, onBack, onStartMix }) {
       </div>
 
       {/* Additives */}
-      {recipe.additives && recipe.additives.length > 0 && (
+      {recipe.additives && recipe.additives.filter(a => a.material).length > 0 && (
         <div className="detail-section">
           <h2 className="section-title">Additives</h2>
           <table className="ingredient-table">
@@ -118,7 +112,7 @@ export default function RecipeDetail({ recipe, onBack, onStartMix }) {
               </tr>
             </thead>
             <tbody>
-              {recipe.additives.map((add, i) => (
+              {recipe.additives.filter(a => a.material).map((add, i) => (
                 <tr key={i} className="ing-row">
                   <td className="ing-td">{add.material}</td>
                   <td className="ing-td ing-td-right">{add.percent}%</td>
@@ -181,13 +175,6 @@ export default function RecipeDetail({ recipe, onBack, onStartMix }) {
           <p className="detail-notes">{recipe.notes}</p>
         </div>
       )}
-
-      {/* Mix button at bottom */}
-      <div className="detail-mix-footer">
-        <button className="mix-btn-large" onClick={() => onStartMix(recipe)}>
-          ⚖️ Start Mixing Session
-        </button>
-      </div>
 
     </div>
   )

@@ -6,7 +6,7 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background-color: #f1f1f1;
+  background-color: #1a1a1a;
   color: #1a1a1a;
 }
 
@@ -14,6 +14,12 @@ body {
 .app-shell {
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
+  background: #1a1a1a;
+}
+
+#root {
+  background: #1a1a1a;
   min-height: 100vh;
 }
 
@@ -48,10 +54,6 @@ body {
 
 .topbar-burger:hover {
   background: rgba(255,255,255,0.1);
-}
-
-.topbar-burger svg {
-  display: block;
 }
 
 .topbar-logo {
@@ -232,7 +234,7 @@ body {
 .nav-item {
   display: flex;
   align-items: center;
-  width: 100%;
+  width: calc(100% - 16px);
   padding: 11px 20px;
   background: none;
   border: none;
@@ -243,7 +245,6 @@ body {
   cursor: pointer;
   border-radius: 6px;
   margin: 1px 8px;
-  width: calc(100% - 16px);
   transition: background 0.15s;
 }
 
@@ -273,6 +274,7 @@ body {
   margin-top: 56px;
   flex: 1;
   min-height: calc(100vh - 56px);
+  background: #1a1a1a;
 }
 
 /* ── Login ── */
@@ -282,7 +284,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: #f1f1f1;
+  background: #1a1a1a;
 }
 
 .login-card {
@@ -290,7 +292,7 @@ body {
   border-radius: 16px;
   padding: 48px 32px;
   text-align: center;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
   max-width: 360px;
   width: 100%;
 }
@@ -300,12 +302,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f1f1f1;
+  background: #1a1a1a;
 }
 
 .loading-card {
   text-align: center;
   padding: 48px;
+  color: white;
 }
 
 /* ── Placeholder ── */
@@ -317,21 +320,38 @@ body {
   color: #999;
   font-size: 16px;
 }
-body {
-  background-color: #f1f1f1 !important;
+
+/* ── Polaris overrides ── */
+:root {
+  --p-color-bg: #1a1a1a;
+  --p-color-bg-app: #1a1a1a;
 }
 
 .Polaris-Page {
-  max-width: 100% !important;
-  padding-left: 0 !important;
-  padding-right: 0 !important;
+  background: transparent !important;
 }
 
-.Polaris-Page > .Polaris-Box {
-  padding-left: 20px !important;
-  padding-right: 20px !important;
+.sidekick-open .app-main {
+  margin-right: 360px;
+  transition: margin-right 0.2s ease;
 }
-body,
-#root {
-  background-color: #f1f1f1 !important;
+
+/* ── Detail title alignment ── */
+.detail-title-block {
+  text-align: left !important;
+}
+
+.detail-type-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-bottom: 6px !important;
+}
+
+.detail-name {
+  text-align: left !important;
+}
+
+.detail-meta {
+  text-align: left !important;
 }
