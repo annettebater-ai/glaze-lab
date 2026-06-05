@@ -22,6 +22,7 @@ import {
   recipeToMarkdown,
   markdownToRecipe
 } from './drive'
+import { testResultToMarkdown, markdownToTestResult } from './testResults'
 import './App.css'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
@@ -75,6 +76,8 @@ function App() {
   const [showNewRecipe, setShowNewRecipe] = useState(false)
   const [editingRecipe, setEditingRecipe] = useState(null)
   const [recipes, setRecipes] = useState([])
+  const [testResults, setTestResults] = useState([])
+  const [mixingSessions, setMixingSessions] = useState([])
   const [vaultFolders, setVaultFolders] = useState(null)
   const [statusMessage, setStatusMessage] = useState('')
   const [selectedRecipe, setSelectedRecipe] = useState(null)
@@ -133,6 +136,8 @@ function App() {
       setVaultFolders(folders)
       setStatusMessage('Loading recipes...')
       await loadRecipes(token, folders.recipes)
+      setStatusMessage('Loading test results...')
+      await loadTestResults(token, folders.testResults)
       setStatusMessage('')
     } catch (error) {
       console.error('Vault init error:', error)
@@ -158,6 +163,26 @@ function App() {
       setRecipes(loaded.filter(Boolean))
     } catch (error) {
       console.error('Failed to load recipes:', error)
+    }
+  }
+
+  const loadTestResults = async (token, folderId) => {
+    if (!folderId) return
+    try {
+      const files = await listFiles(token, folderId)
+      const loaded = await Promise.all(
+        files.map(async (file) => {
+          try {
+            const content = await readFile(token, file.id)
+            return markdownToTestResult(content, file.id)
+          } catch (e) {
+            return null
+          }
+        })
+      )
+      setTestResults(loaded.filter(Boolean))
+    } catch (error) {
+      console.error('Failed to load test results:', error)
     }
   }
 
@@ -192,6 +217,24 @@ function App() {
       setTimeout(() => setStatusMessage(''), 2000)
     } catch (error) {
       console.error('Save error:', error)
+      setStatusMessage('Save failed')
+      setTimeout(() => setStatusMessage(''), 3000)
+    }
+  }
+
+  const handleSaveTestResult = async (resultData) => {
+    if (!accessToken || !vaultFolders) { alert('Not connected to Drive'); return }
+    try {
+      setStatusMessage('Saving test result...')
+      const filename = `${resultData.recipeSlug}-${resultData.id}.md`
+      const content = testResultToMarkdown(resultData)
+      const created = await createFile(accessToken, vaultFolders.testResults, filename, content)
+      resultData.fileId = created.id
+      setTestResults(prev => [resultData, ...prev])
+      setStatusMessage('Saved')
+      setTimeout(() => setStatusMessage(''), 2000)
+    } catch (error) {
+      console.error('Save test result error:', error)
       setStatusMessage('Save failed')
       setTimeout(() => setStatusMessage(''), 3000)
     }
@@ -252,6 +295,8 @@ function App() {
     setAccessToken(null)
     setVaultFolders(null)
     setRecipes([])
+    setTestResults([])
+    setMixingSessions([])
     setSelectedRecipe(null)
     setMixingRecipe(null)
     setEditingRecipe(null)
@@ -278,6 +323,7 @@ function App() {
       <div className="login-screen">
         <div className="login-card">
           <BlockStack gap="400" inlineAlign="center">
+            <GlazeNotesLogo />
             <Text variant="headingXl" as="h1">Glaze Notes</Text>
             <Text variant="bodyMd" tone="subdued">Your personal glaze chemistry studio</Text>
             <Button variant="primary" size="large" onClick={handleSignIn}>
@@ -297,7 +343,7 @@ function App() {
         <MixingSession
           recipe={mixingRecipe}
           onComplete={(sessionData) => {
-            console.log('Session complete:', sessionData)
+            setMixingSessions(prev => [sessionData, ...prev])
             setMixingRecipe(null)
             setSelectedRecipe(null)
           }}
@@ -344,6 +390,9 @@ function App() {
               onBack={() => setSelectedRecipe(null)}
               onStartMix={(recipe) => setMixingRecipe(recipe)}
               onDelete={handleDeleteRecipe}
+              testResults={testResults}
+              mixingSessions={mixingSessions.filter(s => s.recipeId === selectedRecipe.id)}
+              onSaveTestResult={handleSaveTestResult}
             />
           </Page>
         )
@@ -378,6 +427,39 @@ function App() {
       )
     }
 
+    if (currentScreen === 'tests') {
+      const sortedResults = [...testResults].sort((a, b) => new Date(b.date) - new Date(a.date))
+      return (
+        <Page title="Test Results">
+          {sortedResults.length === 0 ? (
+            <Card>
+              <Text tone="subdued">No test results yet. Open a recipe and add a result after firing.</Text>
+            </Card>
+          ) : (
+            <BlockStack gap="300">
+              {sortedResults.map((result, i) => (
+                <Card key={i}>
+                  <InlineStack align="space-between">
+                    <BlockStack gap="100">
+                      <Text variant="headingSm">{result.recipeName}</Text>
+                      <Text variant="bodySm" tone="subdued">{result.date} · {result.clayBody}</Text>
+                    </BlockStack>
+                    <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                      {result.status === 'pending' ? (
+                        <span style={{fontSize: '13px', color: '#aa7700', fontWeight: 600}}>⏳ Pending</span>
+                      ) : (
+                        <span style={{fontSize: '13px', color: '#1a7a1a', fontWeight: 600}}>✓ Completed</span>
+                      )}
+                    </div>
+                  </InlineStack>
+                </Card>
+              ))}
+            </BlockStack>
+          )}
+        </Page>
+      )
+    }
+
     return (
       <Page title={currentScreen.charAt(0).toUpperCase() + currentScreen.slice(1).replace('-', ' ')}>
         <Card>
@@ -389,8 +471,6 @@ function App() {
 
   return (
     <div className="app-shell">
-
-      {/* TopBar */}
       <div className="app-topbar">
         <button className="topbar-burger" onClick={() => setNavOpen(!navOpen)}>
           <BurgerIcon />
@@ -425,7 +505,6 @@ function App() {
         </div>
       </div>
 
-      {/* Nav overlay + drawer */}
       {navOpen && (
         <>
           <div className="nav-overlay" onClick={() => setNavOpen(false)} />
@@ -453,11 +532,9 @@ function App() {
         </>
       )}
 
-      {/* Main content */}
       <div className="app-main">
         {renderScreen()}
       </div>
-
     </div>
   )
 }

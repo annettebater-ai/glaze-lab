@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import TestResultForm from './TestResultForm'
 import './RecipeDetail.css'
 
 const GLAZE_TYPE_COLORS = {
@@ -17,8 +18,18 @@ const FOOD_SAFETY_COLORS = {
   unknown: '#888'
 }
 
-export default function RecipeDetail({ recipe, onBack, onStartMix }) {
+const StarDisplay = ({ value }) => (
+  <div className="star-display">
+    {[1,2,3,4,5].map(n => (
+      <span key={n} className={`star-icon ${n <= value ? 'active' : ''}`}>★</span>
+    ))}
+  </div>
+)
+
+export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, testResults, mixingSessions, onSaveTestResult }) {
   const [showStull, setShowStull] = useState(false)
+  const [showTestForm, setShowTestForm] = useState(false)
+  const [selectedResult, setSelectedResult] = useState(null)
 
   if (!recipe) return null
 
@@ -26,12 +37,111 @@ export default function RecipeDetail({ recipe, onBack, onStartMix }) {
   const ratios = recipe.chemistry?.ratios || {}
   const stull = recipe.chemistry?.stull || {}
 
+  const recipeResults = (testResults || [])
+    .filter(r => r.recipeSlug === recipe.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'))
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+
   const fluxes = ['K2O','Na2O','Li2O','CaO','MgO','ZnO','BaO','SrO','MnO']
     .filter(ox => unity[ox] > 0.001)
   const amphoteric = ['Al2O3','B2O3']
     .filter(ox => unity[ox] > 0.001)
   const glassFormers = ['SiO2','TiO2','P2O5']
     .filter(ox => unity[ox] > 0.001)
+
+  if (showTestForm) {
+    return (
+      <div className="recipe-detail">
+        <div className="detail-title-block">
+          <div className="detail-type-row">
+            <div className="detail-type">New Test Result</div>
+            <button className="detail-mix-btn" style={{background: '#888'}} onClick={() => setShowTestForm(false)}>
+              Cancel
+            </button>
+          </div>
+          <h1 className="detail-name">{recipe.name}</h1>
+        </div>
+        <TestResultForm
+          recipe={recipe}
+          mixingSessions={mixingSessions}
+          onSave={(result) => {
+            onSaveTestResult(result)
+            setShowTestForm(false)
+          }}
+          onCancel={() => setShowTestForm(false)}
+        />
+      </div>
+    )
+  }
+
+  if (selectedResult) {
+    return (
+      <div className="recipe-detail">
+        <div className="detail-title-block">
+          <div className="detail-type-row">
+            <div className="detail-type">Test Result · {selectedResult.date}</div>
+            <button className="detail-mix-btn" style={{background: '#888'}} onClick={() => setSelectedResult(null)}>
+              ← Back
+            </button>
+          </div>
+          <h1 className="detail-name">{recipe.name}</h1>
+          <div className="detail-meta">
+            {selectedResult.clayBody} · {selectedResult.applicationMethod} · {selectedResult.thickness}
+          </div>
+        </div>
+
+        {selectedResult.status === 'completed' && selectedResult.rating > 0 && (
+          <div className="detail-section">
+            <StarDisplay value={selectedResult.rating} />
+          </div>
+        )}
+
+        {selectedResult.layers && selectedResult.layers.length > 0 && (
+          <div className="detail-section">
+            <h2 className="section-title">Layering</h2>
+            {selectedResult.layers.map((l, i) => (
+              <div key={i} className="result-layer-row">
+                <div className="result-layer-num">{i + 1}</div>
+                <div>
+                  <div className="result-layer-type">{l.type}</div>
+                  <div className="result-layer-recipe">{l.recipe}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {selectedResult.notesBefore && (
+          <div className="detail-section">
+            <h2 className="section-title">Notes Before Firing</h2>
+            <p className="detail-notes">{selectedResult.notesBefore}</p>
+          </div>
+        )}
+
+        {selectedResult.status === 'pending' && (
+          <div className="detail-section">
+            <div className="pending-badge">⏳ Awaiting firing</div>
+          </div>
+        )}
+
+        {selectedResult.status === 'completed' && (
+          <>
+            {selectedResult.notesAfter && (
+              <div className="detail-section">
+                <h2 className="section-title">Outcome</h2>
+                <p className="detail-notes">{selectedResult.notesAfter}</p>
+              </div>
+            )}
+            {selectedResult.nextSteps && (
+              <div className="detail-section">
+                <h2 className="section-title">What To Try Next</h2>
+                <p className="detail-notes">{selectedResult.nextSteps}</p>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="recipe-detail">
@@ -49,6 +159,50 @@ export default function RecipeDetail({ recipe, onBack, onStartMix }) {
           Cone {recipe.cone} · {recipe.atmosphere} ·
           <span className={`detail-status ${recipe.status}`}> {recipe.status}</span>
         </div>
+      </div>
+
+      {/* Test Results carousel */}
+      <div className="detail-section">
+        <div className="section-header-row">
+          <h2 className="section-title" style={{marginBottom: 0}}>Test Results</h2>
+          <button className="add-result-btn" onClick={() => setShowTestForm(true)}>
+            + Add Result
+          </button>
+        </div>
+
+        {recipeResults.length === 0 ? (
+          <div className="no-results-hint">
+            No test results yet. Fire a test tile and record the outcome.
+          </div>
+        ) : (
+          <div className="results-carousel">
+            {recipeResults.map((result, i) => (
+              <button
+                key={i}
+                className={`result-tile ${result.status}`}
+                onClick={() => setSelectedResult(result)}
+              >
+                {result.status === 'pending' ? (
+                  <div className="result-tile-pending">
+                    <div className="result-tile-icon">⏳</div>
+                    <div className="result-tile-date">{result.date}</div>
+                    <div className="result-tile-label">Pending</div>
+                  </div>
+                ) : (
+                  <div className="result-tile-completed">
+                    {result.photos && result.photos.length > 0 ? (
+                      <div className="result-tile-photo-placeholder">📷</div>
+                    ) : (
+                      <div className="result-tile-photo-placeholder">🏺</div>
+                    )}
+                    <div className="result-tile-date">{result.date}</div>
+                    <StarDisplay value={result.rating} />
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Chemistry summary cards */}
