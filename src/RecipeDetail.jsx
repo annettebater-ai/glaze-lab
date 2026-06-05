@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import TestResultForm from './TestResultForm'
+import DriveImage from './DriveImage'
 import './RecipeDetail.css'
 
 const GLAZE_TYPE_COLORS = {
@@ -26,9 +27,10 @@ const StarDisplay = ({ value }) => (
   </div>
 )
 
-export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, testResults, mixingSessions, onSaveTestResult }) {
+export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, testResults, mixingSessions, onSaveTestResult, onDeleteTestResult, accessToken, photosFolderId }) {
   const [showStull, setShowStull] = useState(false)
   const [showTestForm, setShowTestForm] = useState(false)
+  const [editingResult, setEditingResult] = useState(null)
   const [selectedResult, setSelectedResult] = useState(null)
 
   if (!recipe) return null
@@ -37,8 +39,9 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
   const ratios = recipe.chemistry?.ratios || {}
   const stull = recipe.chemistry?.stull || {}
 
+  const recipeSlug = recipe.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
   const recipeResults = (testResults || [])
-    .filter(r => r.recipeSlug === recipe.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'))
+    .filter(r => r.recipeSlug === recipeSlug)
     .sort((a, b) => new Date(b.date) - new Date(a.date))
 
   const fluxes = ['K2O','Na2O','Li2O','CaO','MgO','ZnO','BaO','SrO','MnO']
@@ -48,13 +51,22 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
   const glassFormers = ['SiO2','TiO2','P2O5']
     .filter(ox => unity[ox] > 0.001)
 
-  if (showTestForm) {
+  if (showTestForm || editingResult) {
     return (
       <div className="recipe-detail">
         <div className="detail-title-block">
           <div className="detail-type-row">
-            <div className="detail-type">New Test Result</div>
-            <button className="detail-mix-btn" style={{background: '#888'}} onClick={() => setShowTestForm(false)}>
+            <div className="detail-type">
+              {editingResult ? 'Edit Test Result' : 'New Test Result'}
+            </div>
+            <button
+              className="detail-mix-btn"
+              style={{background: '#888'}}
+              onClick={() => {
+                setShowTestForm(false)
+                setEditingResult(null)
+              }}
+            >
               Cancel
             </button>
           </div>
@@ -63,11 +75,22 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
         <TestResultForm
           recipe={recipe}
           mixingSessions={mixingSessions}
+          existingResult={editingResult || null}
+          accessToken={accessToken}
+          photosFolderId={photosFolderId}
           onSave={(result) => {
             onSaveTestResult(result)
             setShowTestForm(false)
+            setEditingResult(null)
           }}
-          onCancel={() => setShowTestForm(false)}
+          onCancel={() => {
+            setShowTestForm(false)
+            setEditingResult(null)
+          }}
+          onDelete={editingResult ? (result) => {
+            onDeleteTestResult(result)
+            setEditingResult(null)
+          } : null}
         />
       </div>
     )
@@ -79,9 +102,25 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
         <div className="detail-title-block">
           <div className="detail-type-row">
             <div className="detail-type">Test Result · {selectedResult.date}</div>
-            <button className="detail-mix-btn" style={{background: '#888'}} onClick={() => setSelectedResult(null)}>
-              ← Back
-            </button>
+            <div style={{display: 'flex', gap: '8px'}}>
+              <button
+                className="detail-mix-btn"
+                style={{background: '#1a3a5c'}}
+                onClick={() => {
+                  setEditingResult(selectedResult)
+                  setSelectedResult(null)
+                }}
+              >
+                Edit
+              </button>
+              <button
+                className="detail-mix-btn"
+                style={{background: '#888'}}
+                onClick={() => setSelectedResult(null)}
+              >
+                ← Back
+              </button>
+            </div>
           </div>
           <h1 className="detail-name">{recipe.name}</h1>
           <div className="detail-meta">
@@ -95,6 +134,23 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
           </div>
         )}
 
+        {selectedResult.photos && selectedResult.photos.length > 0 && (
+          <div className="detail-section">
+            <h2 className="section-title">Photos</h2>
+            <div className="result-photos-grid">
+              {selectedResult.photos.map((p, i) => (
+                <DriveImage
+                  key={i}
+                  fileId={p.fileId || p}
+                  accessToken={accessToken}
+                  alt="Test result"
+                  className="result-photo-img"
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         {selectedResult.layers && selectedResult.layers.length > 0 && (
           <div className="detail-section">
             <h2 className="section-title">Layering</h2>
@@ -103,7 +159,7 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
                 <div className="result-layer-num">{i + 1}</div>
                 <div>
                   <div className="result-layer-type">{l.type}</div>
-                  <div className="result-layer-recipe">{l.recipe}</div>
+                  <div className="result-layer-recipe">{l.recipe || '—'}</div>
                 </div>
               </div>
             ))}
@@ -146,7 +202,6 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
   return (
     <div className="recipe-detail">
 
-      {/* Title block */}
       <div className="detail-title-block">
         <div className="detail-type-row">
           <div className="detail-type">{recipe.recipeType}</div>
@@ -169,7 +224,6 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
             + Add Result
           </button>
         </div>
-
         {recipeResults.length === 0 ? (
           <div className="no-results-hint">
             No test results yet. Fire a test tile and record the outcome.
@@ -191,7 +245,12 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
                 ) : (
                   <div className="result-tile-completed">
                     {result.photos && result.photos.length > 0 ? (
-                      <div className="result-tile-photo-placeholder">📷</div>
+                      <DriveImage
+                        fileId={result.photos[0].fileId || result.photos[0]}
+                        accessToken={accessToken}
+                        alt="Test result"
+                        className="result-tile-photo"
+                      />
                     ) : (
                       <div className="result-tile-photo-placeholder">🏺</div>
                     )}
@@ -205,7 +264,7 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
         )}
       </div>
 
-      {/* Chemistry summary cards */}
+      {/* Chemistry cards */}
       {recipe.chemistry && (
         <div className="detail-section">
           <div className="chemistry-cards">

@@ -27,13 +27,9 @@ async function driveRequest(url, options) {
 
 // ── Folder Management ────────────────────────────────────────
 
-/**
- * Find a folder by name within a parent folder (or root)
- */
 async function findFolder(token, name, parentId = null) {
   let query = `name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`
   if (parentId) query += ` and '${parentId}' in parents`
-
   const data = await driveRequest(
     `${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name)`,
     { headers: authHeaders(token) }
@@ -41,16 +37,13 @@ async function findFolder(token, name, parentId = null) {
   return data.files?.[0] || null
 }
 
-/**
- * Create a folder inside a parent (or root)
- */
 async function createFolder(token, name, parentId = null) {
   const metadata = {
     name,
     mimeType: 'application/vnd.google-apps.folder',
     ...(parentId && { parents: [parentId] })
   }
-  const data = await driveRequest(
+  return driveRequest(
     `${DRIVE_API}/files?fields=id,name`,
     {
       method: 'POST',
@@ -58,12 +51,8 @@ async function createFolder(token, name, parentId = null) {
       body: JSON.stringify(metadata)
     }
   )
-  return data
 }
 
-/**
- * Find or create a folder — returns the folder ID
- */
 async function ensureFolder(token, name, parentId = null) {
   const existing = await findFolder(token, name, parentId)
   if (existing) return existing.id
@@ -71,10 +60,6 @@ async function ensureFolder(token, name, parentId = null) {
   return created.id
 }
 
-/**
- * Set up the full Glaze Lab vault folder structure
- * Returns an object with all folder IDs
- */
 export async function ensureVaultStructure(token) {
   const rootId = await ensureFolder(token, VAULT_NAME)
   const [recipes, clayBodies, firings, testResults, mixingSessions, assets] = await Promise.all([
@@ -94,9 +79,6 @@ export async function ensureVaultStructure(token) {
 
 // ── File Operations ──────────────────────────────────────────
 
-/**
- * List all markdown files in a folder
- */
 export async function listFiles(token, folderId) {
   const query = `'${folderId}' in parents and name contains '.md' and trashed=false`
   const data = await driveRequest(
@@ -106,9 +88,6 @@ export async function listFiles(token, folderId) {
   return data.files || []
 }
 
-/**
- * Read a file's text content by file ID
- */
 export async function readFile(token, fileId) {
   const response = await fetch(
     `${DRIVE_API}/files/${fileId}?alt=media`,
@@ -118,20 +97,15 @@ export async function readFile(token, fileId) {
   return response.text()
 }
 
-/**
- * Create a new text file in a folder
- */
 export async function createFile(token, folderId, filename, content) {
   const metadata = {
     name: filename,
     parents: [folderId],
     mimeType: 'text/markdown'
   }
-
   const form = new FormData()
   form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
   form.append('file', new Blob([content], { type: 'text/markdown' }))
-
   const response = await fetch(
     `${UPLOAD_API}/files?uploadType=multipart&fields=id,name`,
     {
@@ -147,9 +121,6 @@ export async function createFile(token, folderId, filename, content) {
   return response.json()
 }
 
-/**
- * Update an existing file's content
- */
 export async function updateFile(token, fileId, content) {
   const response = await fetch(
     `${UPLOAD_API}/files/${fileId}?uploadType=media`,
@@ -166,9 +137,6 @@ export async function updateFile(token, fileId, content) {
   return response.json()
 }
 
-/**
- * Find a file by name in a folder
- */
 export async function findFile(token, folderId, filename) {
   const query = `name='${filename}' and '${folderId}' in parents and trashed=false`
   const data = await driveRequest(
@@ -178,11 +146,43 @@ export async function findFile(token, folderId, filename) {
   return data.files?.[0] || null
 }
 
+export async function uploadImage(token, folderId, file) {
+  const filename = `${Date.now()}-${file.name}`
+  const metadata = {
+    name: filename,
+    parents: [folderId],
+    mimeType: file.type
+  }
+  const form = new FormData()
+  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
+  form.append('file', file)
+  const response = await fetch(
+    `${UPLOAD_API}/files?uploadType=multipart&fields=id,name`,
+    {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: form
+    }
+  )
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}))
+    throw new Error(`Failed to upload image: ${err?.error?.message || response.status}`)
+  }
+  return response.json()
+}
+
+export async function getPhotoBlob(token, fileId) {
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+    { headers: { 'Authorization': `Bearer ${token}` } }
+  )
+  if (!response.ok) throw new Error('Failed to fetch photo')
+  const blob = await response.blob()
+  return URL.createObjectURL(blob)
+}
+
 // ── Markdown Builders ────────────────────────────────────────
 
-/**
- * Convert a recipe object to a markdown file
- */
 export function recipeToMarkdown(recipe) {
   const slug = recipe.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
   const umf = recipe.chemistry?.unity || {}
@@ -254,21 +254,9 @@ ${additiveTable}
 ## Notes
 
 ${recipe.notes || ''}
-
-## Test Results
-
-\`\`\`dataview
-table clay-body, firing, rating, date
-from "Test Results"
-where glaze = "${slug}"
-sort date desc
-\`\`\`
 `
 }
 
-/**
- * Parse a markdown file back into a recipe object
- */
 export function markdownToRecipe(content, fileId) {
   try {
     const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/)
@@ -281,7 +269,6 @@ export function markdownToRecipe(content, fileId) {
       return match ? match[1].trim() : ''
     }
 
-    // Parse base ingredients from the markdown table
     const baseTableMatch = content.match(/## Base Glaze\n\n\|[^\n]+\|\n\|[^\n]+\|\n([\s\S]*?)(?:\n##|$)/)
     const baseIngredients = []
     if (baseTableMatch) {
@@ -297,7 +284,6 @@ export function markdownToRecipe(content, fileId) {
       })
     }
 
-    // Parse additives
     const additiveTableMatch = content.match(/## Additives\n\n\|[^\n]+\|\n\|[^\n]+\|\n([\s\S]*?)(?:\n##|$)/)
     const additives = []
     if (additiveTableMatch) {
@@ -313,11 +299,9 @@ export function markdownToRecipe(content, fileId) {
       })
     }
 
-    // Parse notes
     const notesMatch = content.match(/## Notes\n\n([\s\S]*?)(?:\n##|$)/)
     const notes = notesMatch ? notesMatch[1].trim() : ''
 
-    // Parse UMF from frontmatter
     const parseUmfSection = (section) => {
       const result = {}
       const sectionMatch = fm.match(new RegExp(`${section}:\\n([\\s\\S]*?)(?:\\n\\w|$)`))

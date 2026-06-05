@@ -1,13 +1,9 @@
-// ── Test Result markdown builder ──────────────────────────────
-
 export function testResultToMarkdown(result) {
   const layers = (result.layers || [])
-    .map((l, i) => `${i + 1}. ${l.type} — ${l.recipe || l.name}`)
+    .map((l, i) => `${i + 1}. ${l.type} — ${l.recipe || ''}`)
     .join('\n')
 
-  const photos = (result.photos || [])
-    .map(p => `![[Assets/photos/${p}]]`)
-    .join('\n')
+  const photosJson = JSON.stringify(result.photos || [])
 
   return `---
 type: test-result
@@ -21,7 +17,7 @@ status: ${result.status}
 application-method: ${result.applicationMethod || ''}
 application-thickness: ${result.thickness || ''}
 rating: ${result.rating || 0}
-photos: [${(result.photos || []).join(', ')}]
+photos: '${photosJson}'
 created: ${result.date}
 modified: ${new Date().toISOString().split('T')[0]}
 ---
@@ -41,10 +37,6 @@ ${result.notesAfter || ''}
 ## What To Try Next
 
 ${result.nextSteps || ''}
-
-## Photos
-
-${photos}
 
 ## AI Diagnosis
 
@@ -66,20 +58,24 @@ export function markdownToTestResult(content, fileId) {
     }
 
     const getSection = (heading) => {
-      const m = content.match(new RegExp(`## ${heading}\\n\\n([\\s\\S]*?)(?:\\n##|$)`))
+      const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const m = content.match(new RegExp(`## ${escaped}\\n\\n([\\s\\S]*?)(?:\\n##|$)`))
       return m ? m[1].trim() : ''
     }
 
-    const photosStr = get('photos')
-    const photos = photosStr
-      ? photosStr.replace(/[\[\]]/g, '').split(',').map(p => p.trim()).filter(Boolean)
-      : []
+    let photos = []
+    try {
+      const photosRaw = get('photos').replace(/^'|'$/g, '')
+      photos = JSON.parse(photosRaw)
+    } catch {
+      photos = []
+    }
 
     const layersText = getSection('Layering Order')
     const layers = layersText && layersText !== 'Not recorded'
       ? layersText.split('\n').map(l => {
-          const m = l.match(/^\d+\.\s+(.+?)\s+—\s+(.+)$/)
-          return m ? { type: m[1], recipe: m[2] } : null
+          const m = l.match(/^\d+\.\s+(.+?)\s+—\s+(.*)$/)
+          return m ? { type: m[1].trim(), recipe: m[2].trim() } : null
         }).filter(Boolean)
       : []
 

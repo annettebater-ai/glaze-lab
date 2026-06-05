@@ -228,9 +228,18 @@ function App() {
       setStatusMessage('Saving test result...')
       const filename = `${resultData.recipeSlug}-${resultData.id}.md`
       const content = testResultToMarkdown(resultData)
-      const created = await createFile(accessToken, vaultFolders.testResults, filename, content)
-      resultData.fileId = created.id
-      setTestResults(prev => [resultData, ...prev])
+      if (resultData.fileId) {
+        await updateFile(accessToken, resultData.fileId, content)
+        setTestResults(prev => prev.map(r => r.id === resultData.id ? resultData : r))
+      } else {
+        const created = await createFile(accessToken, vaultFolders.testResults, filename, content)
+        resultData.fileId = created.id
+        setTestResults(prev => {
+          const exists = prev.find(r => r.id === resultData.id)
+          if (exists) return prev.map(r => r.id === resultData.id ? resultData : r)
+          return [resultData, ...prev]
+        })
+      }
       setStatusMessage('Saved')
       setTimeout(() => setStatusMessage(''), 2000)
     } catch (error) {
@@ -238,6 +247,20 @@ function App() {
       setStatusMessage('Save failed')
       setTimeout(() => setStatusMessage(''), 3000)
     }
+  }
+
+  const handleDeleteTestResult = async (result) => {
+    if (result.fileId && accessToken) {
+      try {
+        await fetch(
+          `https://www.googleapis.com/drive/v3/files/${result.fileId}`,
+          { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } }
+        )
+      } catch (e) {
+        console.error('Delete test result from Drive failed:', e)
+      }
+    }
+    setTestResults(prev => prev.filter(r => r.id !== result.id))
   }
 
   const handleToggleFavourite = (recipeId) => {
@@ -393,6 +416,9 @@ function App() {
               testResults={testResults}
               mixingSessions={mixingSessions.filter(s => s.recipeId === selectedRecipe.id)}
               onSaveTestResult={handleSaveTestResult}
+              onDeleteTestResult={handleDeleteTestResult}
+              accessToken={accessToken}
+              photosFolderId={vaultFolders?.photos}
             />
           </Page>
         )
@@ -442,7 +468,9 @@ function App() {
                   <InlineStack align="space-between">
                     <BlockStack gap="100">
                       <Text variant="headingSm">{result.recipeName}</Text>
-                      <Text variant="bodySm" tone="subdued">{result.date} · {result.clayBody}</Text>
+                      <Text variant="bodySm" tone="subdued">
+                        {result.date} · {result.clayBody}
+                      </Text>
                     </BlockStack>
                     <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
                       {result.status === 'pending' ? (
