@@ -1,13 +1,10 @@
 // ============================================================
 // GLAZE LAB — GOOGLE DRIVE API MODULE
-// Reads and writes markdown files to the Glaze Lab vault
 // ============================================================
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3'
 const UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3'
 const VAULT_NAME = 'Glaze Lab'
-
-// ── Helpers ──────────────────────────────────────────────────
 
 function authHeaders(token) {
   return {
@@ -24,8 +21,6 @@ async function driveRequest(url, options) {
   }
   return response.json()
 }
-
-// ── Folder Management ────────────────────────────────────────
 
 async function findFolder(token, name, parentId = null) {
   let query = `name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`
@@ -76,8 +71,6 @@ export async function ensureVaultStructure(token) {
   ])
   return { rootId, recipes, clayBodies, testResults, mixingSessions, materials, assets, charts, photos }
 }
-
-// ── File Operations ──────────────────────────────────────────
 
 export async function listFiles(token, folderId) {
   const query = `'${folderId}' in parents and name contains '.md' and trashed=false`
@@ -170,8 +163,6 @@ export async function uploadImage(token, folderId, file) {
   }
   return response.json()
 }
-
-// ── Markdown Builders ────────────────────────────────────────
 
 export function recipeToMarkdown(recipe) {
   const slug = recipe.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')

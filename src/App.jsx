@@ -13,6 +13,7 @@ import RecipeForm from './RecipeForm'
 import RecipeDetail from './RecipeDetail'
 import MixingSession from './MixingSession'
 import MaterialsScreen from './MaterialsScreen'
+import ClayBodiesScreen from './ClayBodiesScreen'
 import {
   ensureVaultStructure,
   listFiles,
@@ -25,6 +26,7 @@ import {
 } from './drive'
 import { testResultToMarkdown, markdownToTestResult } from './testResults'
 import { materialToMarkdown, markdownToMaterial, toGrams, fromGrams } from './materials'
+import { clayBodyToMarkdown, markdownToClayBody } from './clayBodies'
 import './App.css'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
@@ -81,6 +83,7 @@ function App() {
   const [testResults, setTestResults] = useState([])
   const [mixingSessions, setMixingSessions] = useState([])
   const [materials, setMaterials] = useState([])
+  const [clayBodies, setClayBodies] = useState([])
   const [vaultFolders, setVaultFolders] = useState(null)
   const [statusMessage, setStatusMessage] = useState('')
   const [selectedRecipe, setSelectedRecipe] = useState(null)
@@ -143,6 +146,8 @@ function App() {
       await loadTestResults(token, folders.testResults)
       setStatusMessage('Loading materials...')
       await loadMaterials(token, folders.materials)
+      setStatusMessage('Loading clay bodies...')
+      await loadClayBodies(token, folders.clayBodies)
       setStatusMessage('')
     } catch (error) {
       console.error('Vault init error:', error)
@@ -202,6 +207,24 @@ function App() {
       setMaterials(loaded.filter(Boolean))
     } catch (error) {
       console.error('Failed to load materials:', error)
+    }
+  }
+
+  const loadClayBodies = async (token, folderId) => {
+    if (!folderId) return
+    try {
+      const files = await listFiles(token, folderId)
+      const loaded = await Promise.all(
+        files.map(async (file) => {
+          try {
+            const content = await readFile(token, file.id)
+            return markdownToClayBody(content, file.id)
+          } catch (e) { return null }
+        })
+      )
+      setClayBodies(loaded.filter(Boolean))
+    } catch (error) {
+      console.error('Failed to load clay bodies:', error)
     }
   }
 
@@ -319,8 +342,46 @@ function App() {
     setMaterials(prev => prev.filter(m => m.id !== material.id))
   }
 
+  const handleSaveClayBody = async (clayBodyData) => {
+    if (!accessToken || !vaultFolders) { alert('Not connected to Drive'); return }
+    try {
+      setStatusMessage('Saving clay body...')
+      const filename = clayBodyData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + clayBodyData.id + '.md'
+      const content = clayBodyToMarkdown(clayBodyData)
+      if (clayBodyData.fileId) {
+        await updateFile(accessToken, clayBodyData.fileId, content)
+        setClayBodies(prev => prev.map(c => c.id === clayBodyData.id ? clayBodyData : c))
+      } else {
+        const created = await createFile(accessToken, vaultFolders.clayBodies, filename, content)
+        clayBodyData.fileId = created.id
+        setClayBodies(prev => {
+          const exists = prev.find(c => c.id === clayBodyData.id)
+          if (exists) return prev.map(c => c.id === clayBodyData.id ? clayBodyData : c)
+          return [clayBodyData, ...prev]
+        })
+      }
+      setStatusMessage('Saved')
+      setTimeout(() => setStatusMessage(''), 2000)
+    } catch (error) {
+      console.error('Save clay body error:', error)
+      setStatusMessage('Save failed')
+      setTimeout(() => setStatusMessage(''), 3000)
+    }
+  }
+
+  const handleDeleteClayBody = async (clayBody) => {
+    if (clayBody.fileId && accessToken) {
+      try {
+        await fetch(
+          `https://www.googleapis.com/drive/v3/files/${clayBody.fileId}`,
+          { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } }
+        )
+      } catch (e) { console.error('Delete clay body failed:', e) }
+    }
+    setClayBodies(prev => prev.filter(c => c.id !== clayBody.id))
+  }
+
   const handleSessionComplete = async (sessionData) => {
-    // Deduct materials from inventory
     const recipe = sessionData.recipe
     const batchGrams = sessionData.batchGrams
     if (!batchGrams || !recipe) return
@@ -345,9 +406,8 @@ function App() {
         updatedMaterials[matIndex] = {
           ...mat,
           amount: parseFloat(newAmount.toFixed(3)),
-          isApproximate: true // becomes approximate after deduction
+          isApproximate: true
         }
-        // Save to Drive
         await handleSaveMaterial(updatedMaterials[matIndex])
       }
     }
@@ -414,6 +474,7 @@ function App() {
     setTestResults([])
     setMixingSessions([])
     setMaterials([])
+    setClayBodies([])
     setSelectedRecipe(null)
     setMixingRecipe(null)
     setEditingRecipe(null)
@@ -511,6 +572,7 @@ function App() {
               accessToken={accessToken}
               photosFolderId={vaultFolders?.photos}
               materials={materials}
+              clayBodies={clayBodies}
             />
           </Page>
         )
@@ -586,6 +648,16 @@ function App() {
           materials={materials}
           onSaveMaterial={handleSaveMaterial}
           onDeleteMaterial={handleDeleteMaterial}
+        />
+      )
+    }
+
+    if (currentScreen === 'clay-bodies') {
+      return (
+        <ClayBodiesScreen
+          clayBodies={clayBodies}
+          onSaveClayBody={handleSaveClayBody}
+          onDeleteClayBody={handleDeleteClayBody}
         />
       )
     }

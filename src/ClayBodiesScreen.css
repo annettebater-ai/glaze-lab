@@ -1,0 +1,76 @@
+.clay-body-form {
+  padding: 4px 0;
+}
+
+.clay-body-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: white;
+  gap: 12px;
+}
+
+.clay-body-row.with-border {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.clay-body-row-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.clay-body-row-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a1a;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.clay-body-row-meta {
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px;
+}
+
+.clay-body-row-coe {
+  font-size: 12px;
+  color: #2d6a9f;
+  margin-top: 2px;
+  font-weight: 500;
+}
+
+.clay-body-row-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.clay-body-action-btn {
+  background: none;
+  border: 1px solid #e3e3e3;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1a1a1a;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.clay-body-action-btn:hover {
+  background: #f5f5f5;
+}
+
+.clay-body-action-btn.danger {
+  color: #cc2200;
+  border-color: #cc2200;
+}
+
+.clay-body-action-btn.danger:hover {
+  background: #fff0f0;
+}
