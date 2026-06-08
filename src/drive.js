@@ -62,19 +62,19 @@ async function ensureFolder(token, name, parentId = null) {
 
 export async function ensureVaultStructure(token) {
   const rootId = await ensureFolder(token, VAULT_NAME)
-  const [recipes, clayBodies, firings, testResults, mixingSessions, assets] = await Promise.all([
+  const [recipes, clayBodies, testResults, mixingSessions, materials, assets] = await Promise.all([
     ensureFolder(token, 'Recipes', rootId),
     ensureFolder(token, 'Clay Bodies', rootId),
-    ensureFolder(token, 'Firings', rootId),
     ensureFolder(token, 'Test Results', rootId),
     ensureFolder(token, 'Mixing Sessions', rootId),
+    ensureFolder(token, 'Materials', rootId),
     ensureFolder(token, 'Assets', rootId),
   ])
   const [charts, photos] = await Promise.all([
     ensureFolder(token, 'charts', assets),
     ensureFolder(token, 'photos', assets),
   ])
-  return { rootId, recipes, clayBodies, firings, testResults, mixingSessions, assets, charts, photos }
+  return { rootId, recipes, clayBodies, testResults, mixingSessions, materials, assets, charts, photos }
 }
 
 // ── File Operations ──────────────────────────────────────────
@@ -169,16 +169,6 @@ export async function uploadImage(token, folderId, file) {
     throw new Error(`Failed to upload image: ${err?.error?.message || response.status}`)
   }
   return response.json()
-}
-
-export async function getPhotoBlob(token, fileId) {
-  const response = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-    { headers: { 'Authorization': `Bearer ${token}` } }
-  )
-  if (!response.ok) throw new Error('Failed to fetch photo')
-  const blob = await response.blob()
-  return URL.createObjectURL(blob)
 }
 
 // ── Markdown Builders ────────────────────────────────────────

@@ -12,6 +12,7 @@ import RecipeTable from './RecipeTable'
 import RecipeForm from './RecipeForm'
 import RecipeDetail from './RecipeDetail'
 import MixingSession from './MixingSession'
+import MaterialsScreen from './MaterialsScreen'
 import {
   ensureVaultStructure,
   listFiles,
@@ -23,6 +24,7 @@ import {
   markdownToRecipe
 } from './drive'
 import { testResultToMarkdown, markdownToTestResult } from './testResults'
+import { materialToMarkdown, markdownToMaterial, toGrams, fromGrams } from './materials'
 import './App.css'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
@@ -78,6 +80,7 @@ function App() {
   const [recipes, setRecipes] = useState([])
   const [testResults, setTestResults] = useState([])
   const [mixingSessions, setMixingSessions] = useState([])
+  const [materials, setMaterials] = useState([])
   const [vaultFolders, setVaultFolders] = useState(null)
   const [statusMessage, setStatusMessage] = useState('')
   const [selectedRecipe, setSelectedRecipe] = useState(null)
@@ -138,6 +141,8 @@ function App() {
       await loadRecipes(token, folders.recipes)
       setStatusMessage('Loading test results...')
       await loadTestResults(token, folders.testResults)
+      setStatusMessage('Loading materials...')
+      await loadMaterials(token, folders.materials)
       setStatusMessage('')
     } catch (error) {
       console.error('Vault init error:', error)
@@ -155,9 +160,7 @@ function App() {
           try {
             const content = await readFile(token, file.id)
             return markdownToRecipe(content, file.id)
-          } catch (e) {
-            return null
-          }
+          } catch (e) { return null }
         })
       )
       setRecipes(loaded.filter(Boolean))
@@ -175,14 +178,30 @@ function App() {
           try {
             const content = await readFile(token, file.id)
             return markdownToTestResult(content, file.id)
-          } catch (e) {
-            return null
-          }
+          } catch (e) { return null }
         })
       )
       setTestResults(loaded.filter(Boolean))
     } catch (error) {
       console.error('Failed to load test results:', error)
+    }
+  }
+
+  const loadMaterials = async (token, folderId) => {
+    if (!folderId) return
+    try {
+      const files = await listFiles(token, folderId)
+      const loaded = await Promise.all(
+        files.map(async (file) => {
+          try {
+            const content = await readFile(token, file.id)
+            return markdownToMaterial(content, file.id)
+          } catch (e) { return null }
+        })
+      )
+      setMaterials(loaded.filter(Boolean))
+    } catch (error) {
+      console.error('Failed to load materials:', error)
     }
   }
 
@@ -256,11 +275,87 @@ function App() {
           `https://www.googleapis.com/drive/v3/files/${result.fileId}`,
           { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } }
         )
-      } catch (e) {
-        console.error('Delete test result from Drive failed:', e)
-      }
+      } catch (e) { console.error('Delete test result failed:', e) }
     }
     setTestResults(prev => prev.filter(r => r.id !== result.id))
+  }
+
+  const handleSaveMaterial = async (materialData) => {
+    if (!accessToken || !vaultFolders) { alert('Not connected to Drive'); return }
+    try {
+      setStatusMessage('Saving material...')
+      const filename = materialData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + materialData.id + '.md'
+      const content = materialToMarkdown(materialData)
+      if (materialData.fileId) {
+        await updateFile(accessToken, materialData.fileId, content)
+        setMaterials(prev => prev.map(m => m.id === materialData.id ? materialData : m))
+      } else {
+        const created = await createFile(accessToken, vaultFolders.materials, filename, content)
+        materialData.fileId = created.id
+        setMaterials(prev => {
+          const exists = prev.find(m => m.id === materialData.id)
+          if (exists) return prev.map(m => m.id === materialData.id ? materialData : m)
+          return [materialData, ...prev]
+        })
+      }
+      setStatusMessage('Saved')
+      setTimeout(() => setStatusMessage(''), 2000)
+    } catch (error) {
+      console.error('Save material error:', error)
+      setStatusMessage('Save failed')
+      setTimeout(() => setStatusMessage(''), 3000)
+    }
+  }
+
+  const handleDeleteMaterial = async (material) => {
+    if (material.fileId && accessToken) {
+      try {
+        await fetch(
+          `https://www.googleapis.com/drive/v3/files/${material.fileId}`,
+          { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } }
+        )
+      } catch (e) { console.error('Delete material failed:', e) }
+    }
+    setMaterials(prev => prev.filter(m => m.id !== material.id))
+  }
+
+  const handleSessionComplete = async (sessionData) => {
+    // Deduct materials from inventory
+    const recipe = sessionData.recipe
+    const batchGrams = sessionData.batchGrams
+    if (!batchGrams || !recipe) return
+
+    const allIngredients = [
+      ...(recipe.baseIngredients || []),
+      ...(recipe.additives || [])
+    ].filter(i => i.material)
+
+    const updatedMaterials = [...materials]
+
+    for (const ing of allIngredients) {
+      const usedGrams = batchGrams * ing.percent / 100
+      const matIndex = updatedMaterials.findIndex(
+        m => m.name.toLowerCase() === ing.material.toLowerCase()
+      )
+      if (matIndex >= 0) {
+        const mat = updatedMaterials[matIndex]
+        const currentGrams = toGrams(mat.amount, mat.unit)
+        const newGrams = Math.max(0, currentGrams - usedGrams)
+        const newAmount = fromGrams(newGrams, mat.unit)
+        updatedMaterials[matIndex] = {
+          ...mat,
+          amount: parseFloat(newAmount.toFixed(3)),
+          isApproximate: true // becomes approximate after deduction
+        }
+        // Save to Drive
+        await handleSaveMaterial(updatedMaterials[matIndex])
+      }
+    }
+
+    setMaterials(updatedMaterials)
+    setMixingSessions(prev => [sessionData, ...prev])
+    setMixingRecipe(null)
+    setSelectedRecipe(null)
   }
 
   const handleToggleFavourite = (recipeId) => {
@@ -276,9 +371,7 @@ function App() {
           `https://www.googleapis.com/drive/v3/files/${recipe.fileId}`,
           { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } }
         )
-      } catch (e) {
-        console.error('Delete from Drive failed:', e)
-      }
+      } catch (e) { console.error('Delete from Drive failed:', e) }
     }
     setRecipes(prev => prev.filter(r => r.id !== recipe.id))
     setSelectedRecipe(null)
@@ -320,6 +413,7 @@ function App() {
     setRecipes([])
     setTestResults([])
     setMixingSessions([])
+    setMaterials([])
     setSelectedRecipe(null)
     setMixingRecipe(null)
     setEditingRecipe(null)
@@ -365,11 +459,8 @@ function App() {
       return (
         <MixingSession
           recipe={mixingRecipe}
-          onComplete={(sessionData) => {
-            setMixingSessions(prev => [sessionData, ...prev])
-            setMixingRecipe(null)
-            setSelectedRecipe(null)
-          }}
+          materials={materials}
+          onComplete={handleSessionComplete}
           onCancel={() => setMixingRecipe(null)}
         />
       )
@@ -419,6 +510,7 @@ function App() {
               onDeleteTestResult={handleDeleteTestResult}
               accessToken={accessToken}
               photosFolderId={vaultFolders?.photos}
+              materials={materials}
             />
           </Page>
         )
@@ -472,7 +564,7 @@ function App() {
                         {result.date} · {result.clayBody}
                       </Text>
                     </BlockStack>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                    <div style={{display: 'flex', alignItems: 'center'}}>
                       {result.status === 'pending' ? (
                         <span style={{fontSize: '13px', color: '#aa7700', fontWeight: 600}}>⏳ Pending</span>
                       ) : (
@@ -485,6 +577,16 @@ function App() {
             </BlockStack>
           )}
         </Page>
+      )
+    }
+
+    if (currentScreen === 'materials') {
+      return (
+        <MaterialsScreen
+          materials={materials}
+          onSaveMaterial={handleSaveMaterial}
+          onDeleteMaterial={handleDeleteMaterial}
+        />
       )
     }
 
