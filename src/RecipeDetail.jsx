@@ -1,3 +1,4 @@
+import StullChart from './StullChart'
 import { useState } from 'react'
 import TestResultForm from './TestResultForm'
 import DriveImage from './DriveImage'
@@ -469,10 +470,12 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
             {showStull ? 'Hide Stull Chart' : 'Show Stull Chart'}
           </button>
           {showStull && (
-            <div className="stull-placeholder">
-              Stull: Al₂O₃ {stull.x} / SiO₂ {stull.y} / Zone: {stull.zone}
-            </div>
-          )}
+  <StullChart
+    al2o3={stull.x}
+    sio2={stull.y}
+    zone={stull.zone}
+  />
+)}
         </div>
       )}
 
