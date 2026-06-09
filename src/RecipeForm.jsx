@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { analyseRecipe, MATERIALS } from './chemistry'
+import { analyseRecipe, MATERIALS as CHEMISTRY_MATERIALS } from './chemistry'
+import { Modal, BlockStack, Text, TextField, Select, InlineStack } from '@shopify/polaris'
+import StullChart from './StullChart'
 import './RecipeForm.css'
-
-const MATERIAL_NAMES = Object.keys(MATERIALS).sort()
 
 const RECIPE_TYPES = [
   'Glaze', 'Underglaze', 'Engobe', 'Flashing Slip',
@@ -25,163 +25,113 @@ const GLAZE_TYPE_COLORS = {
   unknown: '#888888'
 }
 
-function StullChart({ x, y, zone }) {
-  const canvasRef = useRef(null)
+const UNITS = [
+  { label: 'grams (g)', value: 'g' },
+  { label: 'kilograms (kg)', value: 'kg' },
+  { label: 'pounds (lb)', value: 'lb' },
+  { label: 'ounces (oz)', value: 'oz' },
+]
+
+// Autocomplete ingredient input
+function IngredientAutocomplete({ value, onChange, materials, placeholder }) {
+  const [query, setQuery] = useState(value || '')
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => { setQuery(value || '') }, [value])
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    const w = canvas.width
-    const h = canvas.height
-    const pad = { top: 30, right: 20, bottom: 40, left: 40 }
-    const chartW = w - pad.left - pad.right
-    const chartH = h - pad.top - pad.bottom
-
-    // Scale: x = Al2O3 0–0.75, y = SiO2 0–5.5
-    const toCanvasX = (al) => pad.left + (al / 0.75) * chartW
-    const toCanvasY = (si) => pad.top + chartH - (si / 5.5) * chartH
-
-    ctx.clearRect(0, 0, w, h)
-    ctx.fillStyle = '#fafaf8'
-    ctx.fillRect(0, 0, w, h)
-
-    // Draw zones
-    const zones = [
-      { pts: [[0,0],[0.2,0],[0.2,1.5],[0.1,1.0],[0,0.8]], color: '#e8d5c0', label: 'Underfired' },
-      { pts: [[0.2,0],[0.5,0],[0.5,2.5],[0.35,2.5],[0.2,1.5]], color: '#d4e8d0', label: 'Matte' },
-      { pts: [[0.15,1.5],[0.35,1.5],[0.35,3.5],[0.15,3.5]], color: '#c8d8f0', label: 'Microcrystalline' },
-      { pts: [[0.3,2.5],[0.7,2.5],[0.7,5.5],[0.3,5.5]], color: '#f0e8c8', label: 'Glossy' },
-    ]
-
-    zones.forEach(({ pts, color, label }) => {
-      ctx.beginPath()
-      pts.forEach(([ax, sy], i) => {
-        const cx = toCanvasX(ax)
-        const cy = toCanvasY(sy)
-        i === 0 ? ctx.moveTo(cx, cy) : ctx.lineTo(cx, cy)
-      })
-      ctx.closePath()
-      ctx.fillStyle = color
-      ctx.globalAlpha = 0.6
-      ctx.fill()
-      ctx.globalAlpha = 1
-      ctx.strokeStyle = '#aaa'
-      ctx.lineWidth = 0.5
-      ctx.stroke()
-    })
-
-    // Zone labels
-    const zoneLabels = [
-      { text: 'Underfired', ax: 0.08, sy: 0.35 },
-      { text: 'Matte', ax: 0.32, sy: 0.7 },
-      { text: 'Microcrystalline', ax: 0.22, sy: 2.6 },
-      { text: 'Glossy', ax: 0.48, sy: 3.8 },
-    ]
-    ctx.font = '9px -apple-system, sans-serif'
-    ctx.fillStyle = '#666'
-    ctx.textAlign = 'center'
-    zoneLabels.forEach(({ text, ax, sy }) => {
-      ctx.fillText(text, toCanvasX(ax), toCanvasY(sy))
-    })
-
-    // Grid lines
-    ctx.strokeStyle = '#ddd'
-    ctx.lineWidth = 0.5
-    ctx.setLineDash([2, 3])
-    for (let ax = 0; ax <= 0.75; ax += 0.1) {
-      ctx.beginPath()
-      ctx.moveTo(toCanvasX(ax), pad.top)
-      ctx.lineTo(toCanvasX(ax), pad.top + chartH)
-      ctx.stroke()
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
     }
-    for (let sy = 0; sy <= 5.5; sy += 0.5) {
-      ctx.beginPath()
-      ctx.moveTo(pad.left, toCanvasY(sy))
-      ctx.lineTo(pad.left + chartW, toCanvasY(sy))
-      ctx.stroke()
-    }
-    ctx.setLineDash([])
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
-    // Axes
-    ctx.strokeStyle = '#888'
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.moveTo(pad.left, pad.top)
-    ctx.lineTo(pad.left, pad.top + chartH)
-    ctx.lineTo(pad.left + chartW, pad.top + chartH)
-    ctx.stroke()
+  const libraryNames = (materials || []).map(m => m.name)
+  const chemNames = Object.keys(CHEMISTRY_MATERIALS)
+  const allNames = [...new Set([...libraryNames, ...chemNames])].sort()
 
-    // Axis labels
-    ctx.font = '10px -apple-system, sans-serif'
-    ctx.fillStyle = '#555'
-    ctx.textAlign = 'center'
-    ctx.fillText('Al₂O₃', pad.left + chartW / 2, h - 4)
-    ctx.save()
-    ctx.translate(12, pad.top + chartH / 2)
-    ctx.rotate(-Math.PI / 2)
-    ctx.fillText('SiO₂', 0, 0)
-    ctx.restore()
+  const filtered = query.length > 0
+    ? allNames.filter(n => n.toLowerCase().includes(query.toLowerCase()))
+    : []
 
-    // Axis tick values
-    ctx.font = '8px -apple-system, sans-serif'
-    ctx.fillStyle = '#888'
-    ctx.textAlign = 'center'
-    for (let ax = 0; ax <= 0.7; ax += 0.2) {
-      ctx.fillText(ax.toFixed(1), toCanvasX(ax), pad.top + chartH + 12)
-    }
-    ctx.textAlign = 'right'
-    for (let sy = 0; sy <= 5; sy += 1) {
-      ctx.fillText(sy, pad.left - 4, toCanvasY(sy) + 3)
-    }
+  const inLibrary = (name) => libraryNames.some(n => n.toLowerCase() === name.toLowerCase())
 
-    // Plot the glaze point
-    const px = toCanvasX(x)
-    const py = toCanvasY(y)
-    ctx.beginPath()
-    ctx.arc(px, py, 6, 0, Math.PI * 2)
-    ctx.fillStyle = '#1a3a5c'
-    ctx.fill()
-    ctx.strokeStyle = 'white'
-    ctx.lineWidth = 2
-    ctx.stroke()
+  const handleSelect = (name) => {
+    setQuery(name)
+    onChange(name)
+    setOpen(false)
+  }
 
-    // Label the point
-    ctx.font = 'bold 10px -apple-system, sans-serif'
-    ctx.fillStyle = '#1a3a5c'
-    ctx.textAlign = 'left'
-    ctx.fillText(`Al₂O₃ ${x} / SiO₂ ${y}`, px + 10, py + 4)
-
-  }, [x, y])
+  const handleChange = (val) => {
+    setQuery(val)
+    onChange(val)
+    setOpen(true)
+  }
 
   return (
-    <div className="stull-chart-container">
-      <canvas ref={canvasRef} width={320} height={260} className="stull-canvas" />
-      <div className="stull-zone-badge" style={{ color: GLAZE_TYPE_COLORS[zone] }}>
-        Zone: {GLAZE_TYPE_LABELS[zone]}
-      </div>
+    <div ref={ref} style={{position: 'relative', flex: 1}}>
+      <input
+        className="form-input material-input"
+        type="text"
+        placeholder={placeholder || 'Search materials...'}
+        value={query}
+        onChange={e => handleChange(e.target.value)}
+        onFocus={() => query.length > 0 && setOpen(true)}
+        autoComplete="off"
+      />
+      {open && filtered.length > 0 && (
+        <div className="material-dropdown">
+          {filtered.slice(0, 8).map(name => (
+            <button
+              key={name}
+              type="button"
+              className="material-dropdown-item"
+              onClick={() => handleSelect(name)}
+            >
+              <span>{name}</span>
+              {!inLibrary(name) && (
+                <span className="not-in-library">not in library</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-function RecipeForm({ onSave, onCancel }) {
+function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
+  const isEdit = !!recipe
+
   const [activeTab, setActiveTab] = useState('details')
-  const [recipeType, setRecipeType] = useState('Glaze')
-  const [name, setName] = useState('')
-  const [cone, setCone] = useState('6')
-  const [atmosphere, setAtmosphere] = useState('oxidation')
-  const [status, setStatus] = useState('testing')
-  const [baseIngredients, setBaseIngredients] = useState([
-    { material: '', percent: '' },
-    { material: '', percent: '' },
-    { material: '', percent: '' },
-  ])
-  const [additives, setAdditives] = useState([
-    { material: '', percent: '' }
-  ])
+  const [recipeType, setRecipeType] = useState(recipe?.recipeType || 'Glaze')
+  const [name, setName] = useState(recipe?.name || '')
+  const [cone, setCone] = useState(recipe?.cone || '6')
+  const [atmosphere, setAtmosphere] = useState(recipe?.atmosphere || 'oxidation')
+  const [status, setStatus] = useState(recipe?.status || 'testing')
+  const [baseIngredients, setBaseIngredients] = useState(
+    recipe?.baseIngredients?.length > 0
+      ? recipe.baseIngredients.map(i => ({ material: i.material, percent: String(i.percent) }))
+      : [{ material: '', percent: '' }, { material: '', percent: '' }, { material: '', percent: '' }]
+  )
+  const [additives, setAdditives] = useState(
+    recipe?.additives?.length > 0
+      ? recipe.additives.map(i => ({ material: i.material, percent: String(i.percent) }))
+      : [{ material: '', percent: '' }]
+  )
   const [chemistry, setChemistry] = useState(null)
   const [showStull, setShowStull] = useState(false)
-  const [notes, setNotes] = useState('')
+  const [notes, setNotes] = useState(recipe?.notes || '')
+
+  // Add to library modal
+  const [addMaterialModal, setAddMaterialModal] = useState(false)
+  const [pendingMaterialName, setPendingMaterialName] = useState('')
+  const [newMatAmount, setNewMatAmount] = useState('0')
+  const [newMatUnit, setNewMatUnit] = useState('g')
+  const [newMatApprox, setNewMatApprox] = useState(false)
+  const [pendingIngredient, setPendingIngredient] = useState(null) // { section, index, name }
 
   useEffect(() => {
     const valid = baseIngredients.filter(i => i.material && parseFloat(i.percent) > 0)
@@ -208,10 +158,35 @@ function RecipeForm({ onSave, onCancel }) {
     setBaseIngredients(baseIngredients.filter((_, i) => i !== index))
   }
 
-  const updateBaseIngredient = (index, field, value) => {
+  const handleBaseIngredientChange = (index, field, value) => {
     const updated = [...baseIngredients]
     updated[index] = { ...updated[index], [field]: value }
     setBaseIngredients(updated)
+
+    // Check if material is in library when name changes
+    if (field === 'material' && value) {
+      const inLibrary = (materials || []).some(
+        m => m.name.toLowerCase() === value.toLowerCase()
+      )
+      const inChemistry = Object.keys(CHEMISTRY_MATERIALS).some(
+        m => m.toLowerCase() === value.toLowerCase()
+      )
+      if (!inLibrary && inChemistry === false && value.trim().length > 2) {
+        // Will be caught on save
+      }
+    }
+  }
+
+  const handleBaseIngredientBlur = (index, value) => {
+    if (!value || !value.trim()) return
+    const inLibrary = (materials || []).some(
+      m => m.name.toLowerCase() === value.toLowerCase()
+    )
+    if (!inLibrary) {
+      setPendingMaterialName(value)
+      setPendingIngredient({ section: 'base', index })
+      setAddMaterialModal(true)
+    }
   }
 
   const addAdditive = () => {
@@ -222,10 +197,42 @@ function RecipeForm({ onSave, onCancel }) {
     setAdditives(additives.filter((_, i) => i !== index))
   }
 
-  const updateAdditive = (index, field, value) => {
+  const handleAdditiveChange = (index, field, value) => {
     const updated = [...additives]
     updated[index] = { ...updated[index], [field]: value }
     setAdditives(updated)
+  }
+
+  const handleAdditiveBlur = (index, value) => {
+    if (!value || !value.trim()) return
+    const inLibrary = (materials || []).some(
+      m => m.name.toLowerCase() === value.toLowerCase()
+    )
+    if (!inLibrary) {
+      setPendingMaterialName(value)
+      setPendingIngredient({ section: 'additive', index })
+      setAddMaterialModal(true)
+    }
+  }
+
+  const handleAddMaterialConfirm = () => {
+    if (onAddMaterial) {
+      onAddMaterial({
+        name: pendingMaterialName,
+        amount: parseFloat(newMatAmount) || 0,
+        startingAmount: parseFloat(newMatAmount) || 0,
+        unit: newMatUnit,
+        isApproximate: newMatApprox,
+        id: Date.now().toString(),
+        created: new Date().toISOString().split('T')[0],
+      })
+    }
+    setAddMaterialModal(false)
+    setPendingMaterialName('')
+    setNewMatAmount('0')
+    setNewMatUnit('g')
+    setNewMatApprox(false)
+    setPendingIngredient(null)
   }
 
   const baseTotal = baseIngredients.reduce((sum, i) => sum + (parseFloat(i.percent) || 0), 0)
@@ -244,10 +251,16 @@ function RecipeForm({ onSave, onCancel }) {
       percent: Math.round((parseFloat(i.percent) / total) * 1000) / 10
     }))
     onSave({
-      name: name.trim(), recipeType, cone, atmosphere, status,
+      ...(isEdit ? recipe : {}),
+      name: name.trim(),
+      recipeType,
+      cone,
+      atmosphere,
+      status,
       baseIngredients: normalisedBase,
       additives: additives.filter(i => i.material && parseFloat(i.percent) > 0),
-      chemistry, notes
+      chemistry,
+      notes
     })
   }
 
@@ -268,6 +281,7 @@ function RecipeForm({ onSave, onCancel }) {
           {RECIPE_TYPES.map(t => (
             <button
               key={t}
+              type="button"
               className={`type-pill ${recipeType === t ? 'active' : ''}`}
               onClick={() => setRecipeType(t)}
             >{t}</button>
@@ -320,52 +334,58 @@ function RecipeForm({ onSave, onCancel }) {
       {/* Tabs */}
       <div className="form-tabs">
         <button
+          type="button"
           className={`form-tab ${activeTab === 'details' ? 'active' : ''}`}
           onClick={() => setActiveTab('details')}
         >Recipe</button>
         <button
+          type="button"
           className={`form-tab ${activeTab === 'layering' ? 'active' : ''}`}
           onClick={() => setActiveTab('layering')}
         >Layering</button>
       </div>
 
-      {/* Details Tab */}
       {activeTab === 'details' && (
         <>
           {/* Base Glaze */}
           <div className="form-section">
             <div className="section-header">
               <label className="form-label">Base</label>
-              <span className="section-hint">Totals 100%</span>
+              <span className="section-hint">
+                Total: {baseTotal.toFixed(1)} → normalised to 100%
+              </span>
             </div>
             {baseIngredients.map((ing, index) => (
               <div key={index} className="ingredient-row">
-                <select
-                  className="form-select material-select"
+                <IngredientAutocomplete
                   value={ing.material}
-                  onChange={e => updateBaseIngredient(index, 'material', e.target.value)}
-                >
-                  <option value="">Select material...</option>
-                  {MATERIAL_NAMES.map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
+                  materials={materials}
+                  placeholder="Search or add material..."
+                  onChange={(val) => handleBaseIngredientChange(index, 'material', val)}
+                  onBlur={() => handleBaseIngredientBlur(index, ing.material)}
+                />
                 <input
                   className="form-input parts-input"
                   type="number"
                   placeholder="0"
                   value={ing.percent}
-                  onChange={e => updateBaseIngredient(index, 'percent', e.target.value)}
+                  onChange={e => handleBaseIngredientChange(index, 'percent', e.target.value)}
                 />
                 <span className="normalised-pct">
                   {getNormalisedPercent(ing.percent) ? `${getNormalisedPercent(ing.percent)}%` : '—'}
                 </span>
-                <button className="remove-btn" onClick={() => removeBaseIngredient(index)}>✕</button>
+                <button
+                  type="button"
+                  className="remove-btn"
+                  onClick={() => removeBaseIngredient(index)}
+                >✕</button>
               </div>
             ))}
-            <button className="add-ingredient-btn" onClick={addBaseIngredient}>
-              + Add Ingredient
-            </button>
+            <button
+              type="button"
+              className="add-ingredient-btn"
+              onClick={addBaseIngredient}
+            >+ Add Ingredient</button>
           </div>
 
           {/* Additives */}
@@ -376,30 +396,33 @@ function RecipeForm({ onSave, onCancel }) {
             </div>
             {additives.map((add, index) => (
               <div key={index} className="ingredient-row">
-                <select
-                  className="form-select material-select"
+                <IngredientAutocomplete
                   value={add.material}
-                  onChange={e => updateAdditive(index, 'material', e.target.value)}
-                >
-                  <option value="">Select material...</option>
-                  {MATERIAL_NAMES.map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
+                  materials={materials}
+                  placeholder="Search or add material..."
+                  onChange={(val) => handleAdditiveChange(index, 'material', val)}
+                  onBlur={() => handleAdditiveBlur(index, add.material)}
+                />
                 <input
                   className="form-input parts-input"
                   type="number"
                   placeholder="0"
                   value={add.percent}
-                  onChange={e => updateAdditive(index, 'percent', e.target.value)}
+                  onChange={e => handleAdditiveChange(index, 'percent', e.target.value)}
                 />
                 <span className="normalised-pct"></span>
-                <button className="remove-btn" onClick={() => removeAdditive(index)}>✕</button>
+                <button
+                  type="button"
+                  className="remove-btn"
+                  onClick={() => removeAdditive(index)}
+                >✕</button>
               </div>
             ))}
-            <button className="add-ingredient-btn" onClick={addAdditive}>
-              + Add Additive
-            </button>
+            <button
+              type="button"
+              className="add-ingredient-btn"
+              onClick={addAdditive}
+            >+ Add Additive</button>
           </div>
 
           {/* Live Chemistry */}
@@ -466,8 +489,8 @@ function RecipeForm({ onSave, onCancel }) {
                 </div>
               </div>
 
-              {/* Stull Chart Toggle */}
               <button
+                type="button"
                 className="stull-btn"
                 onClick={() => setShowStull(!showStull)}
               >
@@ -476,8 +499,8 @@ function RecipeForm({ onSave, onCancel }) {
 
               {showStull && (
                 <StullChart
-                  x={chemistry.stull.x}
-                  y={chemistry.stull.y}
+                  al2o3={chemistry.stull.x}
+                  sio2={chemistry.stull.y}
                   zone={chemistry.stull.zone}
                 />
               )}
@@ -498,7 +521,6 @@ function RecipeForm({ onSave, onCancel }) {
         </>
       )}
 
-      {/* Layering Tab */}
       {activeTab === 'layering' && (
         <div className="layering-panel">
           <div className="layering-intro">
@@ -516,9 +538,66 @@ function RecipeForm({ onSave, onCancel }) {
 
       {/* Actions */}
       <div className="form-actions">
-        <button className="cancel-btn" onClick={onCancel}>Cancel</button>
-        <button className="save-btn" onClick={handleSave}>Save Recipe</button>
+        <button type="button" className="cancel-btn" onClick={onCancel}>Cancel</button>
+        <button type="button" className="save-btn" onClick={handleSave}>
+          {isEdit ? 'Save Changes' : 'Save Recipe'}
+        </button>
       </div>
+
+      {/* Add to library modal */}
+      <Modal
+        open={addMaterialModal}
+        onClose={() => setAddMaterialModal(false)}
+        title={`Add "${pendingMaterialName}" to Materials`}
+        primaryAction={{
+          content: 'Add to Library',
+          onAction: handleAddMaterialConfirm
+        }}
+        secondaryActions={[{
+          content: 'Skip',
+          onAction: () => setAddMaterialModal(false)
+        }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            <Text tone="subdued">
+              This material isn't in your library yet. Add it now so inventory can be tracked.
+            </Text>
+            <InlineStack gap="300" blockAlign="end">
+              <div style={{flex: 1}}>
+                <TextField
+                  label="Amount on hand"
+                  type="number"
+                  value={newMatAmount}
+                  onChange={setNewMatAmount}
+                  autoComplete="off"
+                  helpText="Set to 0 if you haven't measured it yet"
+                />
+              </div>
+              <div style={{flex: 1}}>
+                <Select
+                  label="Unit"
+                  options={UNITS}
+                  value={newMatUnit}
+                  onChange={setNewMatUnit}
+                />
+              </div>
+            </InlineStack>
+            <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+              <input
+                type="checkbox"
+                id="new-mat-approx"
+                checked={newMatApprox}
+                onChange={e => setNewMatApprox(e.target.checked)}
+                style={{width: '16px', height: '16px', cursor: 'pointer'}}
+              />
+              <label htmlFor="new-mat-approx" style={{fontSize: '14px', cursor: 'pointer'}}>
+                This is an estimate
+              </label>
+            </div>
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
 
     </div>
   )

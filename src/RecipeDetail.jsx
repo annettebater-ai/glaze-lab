@@ -1,7 +1,7 @@
-import StullChart from './StullChart'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import TestResultForm from './TestResultForm'
 import DriveImage from './DriveImage'
+import StullChart from './StullChart'
 import { getStockStatus, toGrams } from './materials'
 import { getCompatibilityWarnings } from './clayBodies'
 import './RecipeDetail.css'
@@ -30,35 +30,25 @@ const StarDisplay = ({ value }) => (
   </div>
 )
 
-function IngredientStockBadge({ name, percent, batchGrams, materials }) {
+function IngredientStockBadge({ name, materials }) {
   const mat = (materials || []).find(m => m.name.toLowerCase() === name?.toLowerCase())
   if (!mat) return null
-
   const status = getStockStatus(mat)
   if (!status || status === 'ok') return null
-
-  if (status === 'out') {
-    return <span className="ing-stock-badge out">Out</span>
-  }
-  if (status === 'low') {
-    return <span className="ing-stock-badge low">Low</span>
-  }
+  if (status === 'out') return <span className="ing-stock-badge out">Out</span>
+  if (status === 'low') return <span className="ing-stock-badge low">Low</span>
   return null
 }
 
 function CompatibilityWarnings({ recipe, clayBodies, testResults }) {
   if (!clayBodies?.length) return null
-
   const allWarnings = []
 
   clayBodies.forEach(cb => {
-    // Chemistry warnings
     const chemWarnings = getCompatibilityWarnings(recipe, cb)
     chemWarnings.forEach(w => {
       allWarnings.push({ ...w, clayBody: cb.name, source: 'chemistry' })
     })
-
-    // Rating-based warnings from test results
     const recipeSlug = recipe.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
     const relevantResults = (testResults || []).filter(r =>
       r.recipeSlug === recipeSlug &&
@@ -67,7 +57,6 @@ function CompatibilityWarnings({ recipe, clayBodies, testResults }) {
       r.rating > 0 &&
       r.rating <= 2
     )
-
     relevantResults.forEach(result => {
       allWarnings.push({
         type: 'experience',
@@ -102,7 +91,62 @@ function CompatibilityWarnings({ recipe, clayBodies, testResults }) {
   )
 }
 
-export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, testResults, mixingSessions, onSaveTestResult, onDeleteTestResult, accessToken, photosFolderId, materials, clayBodies }) {
+function InlineNameEditor({ name, onSave }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(name)
+  const inputRef = useRef(null)
+
+  useEffect(() => { setValue(name) }, [name])
+
+  useEffect(() => {
+    if (editing && inputRef.current) inputRef.current.focus()
+  }, [editing])
+
+  const handleSave = () => {
+    const trimmed = value.trim()
+    if (trimmed && trimmed !== name) onSave(trimmed)
+    setEditing(false)
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleSave()
+    if (e.key === 'Escape') { setValue(name); setEditing(false) }
+  }
+
+  if (editing) {
+    return (
+      <div className="inline-name-editor">
+        <input
+          ref={inputRef}
+          className="inline-name-input"
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={handleKeyDown}
+        />
+        <button
+          type="button"
+          className="inline-name-save"
+          onMouseDown={e => e.preventDefault()}
+          onClick={handleSave}
+        >✓</button>
+      </div>
+    )
+  }
+
+  return (
+    <h1
+      className="detail-name editable"
+      onClick={() => setEditing(true)}
+      title="Click to edit name"
+    >
+      {name}
+      <span className="edit-pencil">✎</span>
+    </h1>
+  )
+}
+
+export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onSaveRecipe, testResults, mixingSessions, onSaveTestResult, onDeleteTestResult, accessToken, photosFolderId, materials, clayBodies }) {
   const [showStull, setShowStull] = useState(false)
   const [showTestForm, setShowTestForm] = useState(false)
   const [editingResult, setEditingResult] = useState(null)
@@ -125,6 +169,12 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
     .filter(ox => unity[ox] > 0.001)
   const glassFormers = ['SiO2','TiO2','P2O5']
     .filter(ox => unity[ox] > 0.001)
+
+  const handleNameSave = (newName) => {
+    if (onSaveRecipe) {
+      onSaveRecipe({ ...recipe, name: newName })
+    }
+  }
 
   if (showTestForm || editingResult) {
     return (
@@ -284,21 +334,19 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
             Start Mixing
           </button>
         </div>
-        <h1 className="detail-name">{recipe.name}</h1>
+        <InlineNameEditor name={recipe.name} onSave={handleNameSave} />
         <div className="detail-meta">
           Cone {recipe.cone} · {recipe.atmosphere} ·
           <span className={`detail-status ${recipe.status}`}> {recipe.status}</span>
         </div>
       </div>
 
-      {/* Compatibility warnings */}
       <CompatibilityWarnings
         recipe={recipe}
         clayBodies={clayBodies}
         testResults={testResults}
       />
 
-      {/* Test Results carousel */}
       <div className="detail-section">
         <div className="section-header-row">
           <h2 className="section-title" style={{marginBottom: 0}}>Test Results</h2>
@@ -346,7 +394,6 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
         )}
       </div>
 
-      {/* Chemistry cards */}
       {recipe.chemistry && (
         <div className="detail-section">
           <div className="chemistry-cards">
@@ -374,7 +421,6 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
         </div>
       )}
 
-      {/* Base ingredients */}
       <div className="detail-section">
         <h2 className="section-title">Base Glaze</h2>
         <table className="ingredient-table">
@@ -389,11 +435,7 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
               <tr key={i} className="ing-row">
                 <td className="ing-td">
                   <span>{ing.material}</span>
-                  <IngredientStockBadge
-                    name={ing.material}
-                    percent={ing.percent}
-                    materials={materials}
-                  />
+                  <IngredientStockBadge name={ing.material} materials={materials} />
                 </td>
                 <td className="ing-td ing-td-right">{ing.percent}%</td>
               </tr>
@@ -402,7 +444,6 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
         </table>
       </div>
 
-      {/* Additives */}
       {recipe.additives && recipe.additives.filter(a => a.material).length > 0 && (
         <div className="detail-section">
           <h2 className="section-title">Additives</h2>
@@ -418,11 +459,7 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
                 <tr key={i} className="ing-row">
                   <td className="ing-td">
                     <span>{add.material}</span>
-                    <IngredientStockBadge
-                      name={add.material}
-                      percent={add.percent}
-                      materials={materials}
-                    />
+                    <IngredientStockBadge name={add.material} materials={materials} />
                   </td>
                   <td className="ing-td ing-td-right">{add.percent}%</td>
                 </tr>
@@ -432,7 +469,6 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
         </div>
       )}
 
-      {/* UMF */}
       {recipe.chemistry && (
         <div className="detail-section">
           <h2 className="section-title">Unity Molecular Formula</h2>
@@ -470,16 +506,15 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
             {showStull ? 'Hide Stull Chart' : 'Show Stull Chart'}
           </button>
           {showStull && (
-  <StullChart
-    al2o3={stull.x}
-    sio2={stull.y}
-    zone={stull.zone}
-  />
-)}
+            <StullChart
+              al2o3={stull.x}
+              sio2={stull.y}
+              zone={stull.zone}
+            />
+          )}
         </div>
       )}
 
-      {/* Notes */}
       {recipe.notes && (
         <div className="detail-section">
           <h2 className="section-title">Notes</h2>

@@ -12,7 +12,7 @@ import {
   InlineStack,
   BlockStack,
   useIndexResourceState,
-  useBreakpoints,
+  Tabs,
 } from '@shopify/polaris'
 import { EditIcon, DeleteIcon } from '@shopify/polaris-icons'
 
@@ -38,11 +38,12 @@ const STATUS_PROGRESS = {
   retired: 'incomplete'
 }
 
-export default function RecipeTable({ recipes, onSelectRecipe, onToggleFavourite, onDeleteRecipe, onEditRecipe }) {
+export default function RecipeTable({ recipes, onSelectRecipe, onToggleFavourite, onDeleteRecipe, onEditRecipe, testResults, materials }) {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [filterType, setFilterType] = useState('All')
   const [filterStatus, setFilterStatus] = useState('All')
   const [filterCone, setFilterCone] = useState('All')
+  const [selectedTab, setSelectedTab] = useState(0)
   const [search, setSearch] = useState('')
   const [sortCol, setSortCol] = useState('name')
   const [sortDir, setSortDir] = useState('ascending')
@@ -53,12 +54,61 @@ export default function RecipeTable({ recipes, onSelectRecipe, onToggleFavourite
   const cones = ['All', ...new Set(recipes.map(r => r.cone).filter(Boolean))].sort()
   const statuses = ['All', 'testing', 'stable', 'retired']
 
+  const isAvailable = (recipe) => {
+    const slug = recipe.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    const hasCompletedTest = (testResults || []).some(
+      r => r.recipeSlug === slug && r.status === 'completed'
+    )
+    if (!hasCompletedTest) return false
+    const allIngredients = [
+      ...(recipe.baseIngredients || []),
+      ...(recipe.additives || [])
+    ].filter(i => i.material)
+    const allInStock = allIngredients.every(ing => {
+      const mat = (materials || []).find(m => m.name.toLowerCase() === ing.material.toLowerCase())
+      if (!mat) return true
+      return mat.amount > 0
+    })
+    return allInStock
+  }
+
+  const isTested = (recipe) => {
+    const slug = recipe.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    return (testResults || []).some(r => r.recipeSlug === slug && r.status === 'completed')
+  }
+
+  const availableCount = recipes.filter(r => isAvailable(r)).length
+  const testedCount = recipes.filter(r => isTested(r)).length
+  const untestedCount = recipes.filter(r => !isTested(r)).length
+
+  const tabs = [
+    { id: 'all', content: 'All' },
+    { id: 'available', content: `Available (${availableCount})` },
+    { id: 'tested', content: `Tested (${testedCount})` },
+    { id: 'untested', content: `Untested (${untestedCount})` },
+  ]
+
+  const filterByTab = (recipe) => {
+    if (selectedTab === 0) return true
+    if (selectedTab === 1) return isAvailable(recipe)
+    if (selectedTab === 2) return isTested(recipe)
+    if (selectedTab === 3) return !isTested(recipe)
+    return true
+  }
+
   const filtered = recipes
+    .filter(filterByTab)
     .filter(r => filterType === 'All' || r.recipeType === filterType)
     .filter(r => filterStatus === 'All' || r.status === filterStatus)
     .filter(r => filterCone === 'All' || r.cone === filterCone)
     .filter(r => !search || r.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
+      if (selectedTab === 0) {
+        const aAvail = isAvailable(a)
+        const bAvail = isAvailable(b)
+        if (aAvail && !bAvail) return -1
+        if (!aAvail && bAvail) return 1
+      }
       const getVal = (r) => {
         if (sortCol === 'zone') return r.chemistry?.stull?.zone || ''
         if (sortCol === 'foodSafety') return r.chemistry?.ratios?.foodSafety || ''
@@ -86,6 +136,8 @@ export default function RecipeTable({ recipes, onSelectRecipe, onToggleFavourite
   const rowMarkup = filtered.map((recipe, index) => {
     const zone = recipe.chemistry?.stull?.zone || 'unknown'
     const foodSafety = recipe.chemistry?.ratios?.foodSafety || 'unknown'
+    const available = isAvailable(recipe)
+    const tested = isTested(recipe)
 
     return (
       <IndexTable.Row
@@ -96,9 +148,11 @@ export default function RecipeTable({ recipes, onSelectRecipe, onToggleFavourite
         onClick={() => onSelectRecipe(recipe)}
       >
         <IndexTable.Cell>
-          <Text variant="bodyMd" fontWeight="semibold">
-            {recipe.name}
-          </Text>
+          <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+            <Text variant="bodyMd" fontWeight="semibold">{recipe.name}</Text>
+            {available && <Badge tone="success">Available</Badge>}
+            {!available && tested && <Badge tone="info">Tested</Badge>}
+          </div>
         </IndexTable.Cell>
         <IndexTable.Cell>
           <Text variant="bodyMd" tone="subdued">{recipe.recipeType}</Text>
@@ -154,6 +208,15 @@ export default function RecipeTable({ recipes, onSelectRecipe, onToggleFavourite
 
   return (
     <>
+      {/* Tabs */}
+      <Card padding="0">
+        <Tabs
+          tabs={tabs}
+          selected={selectedTab}
+          onSelect={setSelectedTab}
+        />
+      </Card>
+
       {/* Filters */}
       <Card>
         <BlockStack gap="300">
@@ -224,7 +287,7 @@ export default function RecipeTable({ recipes, onSelectRecipe, onToggleFavourite
           ]}
           emptyState={
             <div style={{padding: '40px', textAlign: 'center'}}>
-              <Text tone="subdued">No recipes found. Add your first recipe to get started.</Text>
+              <Text tone="subdued">No recipes found.</Text>
             </div>
           }
         >
@@ -232,7 +295,6 @@ export default function RecipeTable({ recipes, onSelectRecipe, onToggleFavourite
         </IndexTable>
       </Card>
 
-      {/* Delete confirmation modal */}
       <Modal
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
@@ -242,12 +304,10 @@ export default function RecipeTable({ recipes, onSelectRecipe, onToggleFavourite
           destructive: true,
           onAction: confirmDelete,
         }}
-        secondaryActions={[
-          {
-            content: 'Cancel',
-            onAction: () => setDeleteTarget(null),
-          },
-        ]}
+        secondaryActions={[{
+          content: 'Cancel',
+          onAction: () => setDeleteTarget(null),
+        }]}
       >
         <Modal.Section>
           <Text>

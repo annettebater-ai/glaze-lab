@@ -230,29 +230,37 @@ function App() {
 
   const handleSaveRecipe = async (recipeData) => {
     if (!accessToken || !vaultFolders) { alert('Not connected to Drive'); return }
-    const isEdit = !!editingRecipe
+    const isEdit = !!editingRecipe || !!recipeData.fileId
+    const existingRecipe = editingRecipe || recipes.find(r => r.id === recipeData.id)
     const newRecipe = {
       ...recipeData,
-      id: isEdit ? editingRecipe.id : Date.now().toString(),
-      fileId: isEdit ? editingRecipe.fileId : undefined,
-      created: isEdit ? editingRecipe.created : new Date().toISOString().split('T')[0],
-      favourite: isEdit ? editingRecipe.favourite : false,
-      testCount: isEdit ? editingRecipe.testCount : 0
+      id: isEdit ? (existingRecipe?.id || recipeData.id) : Date.now().toString(),
+      fileId: isEdit ? (existingRecipe?.fileId || recipeData.fileId) : undefined,
+      created: isEdit ? (existingRecipe?.created || recipeData.created) : new Date().toISOString().split('T')[0],
+      favourite: isEdit ? (existingRecipe?.favourite || false) : false,
+      testCount: isEdit ? (existingRecipe?.testCount || 0) : 0
     }
     const slug = newRecipe.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
     const filename = slug + '.md'
     const content = recipeToMarkdown(newRecipe)
     try {
       setStatusMessage('Saving...')
-      const existing = await findFile(accessToken, vaultFolders.recipes, filename)
-      if (existing) {
-        await updateFile(accessToken, existing.id, content)
-        newRecipe.fileId = existing.id
+      if (newRecipe.fileId) {
+        await updateFile(accessToken, newRecipe.fileId, content)
       } else {
-        const created = await createFile(accessToken, vaultFolders.recipes, filename, content)
-        newRecipe.fileId = created.id
+        const existing = await findFile(accessToken, vaultFolders.recipes, filename)
+        if (existing) {
+          await updateFile(accessToken, existing.id, content)
+          newRecipe.fileId = existing.id
+        } else {
+          const created = await createFile(accessToken, vaultFolders.recipes, filename, content)
+          newRecipe.fileId = created.id
+        }
       }
       setRecipes(prev => [newRecipe, ...prev.filter(r => r.id !== newRecipe.id)])
+      if (selectedRecipe?.id === newRecipe.id) {
+        setSelectedRecipe(newRecipe)
+      }
       setShowNewRecipe(false)
       setEditingRecipe(null)
       setStatusMessage('Saved')
@@ -547,6 +555,8 @@ function App() {
                 setShowNewRecipe(false)
                 setEditingRecipe(null)
               }}
+              materials={materials}
+              onAddMaterial={handleSaveMaterial}
             />
           </Page>
         )
@@ -565,6 +575,7 @@ function App() {
               onBack={() => setSelectedRecipe(null)}
               onStartMix={(recipe) => setMixingRecipe(recipe)}
               onDelete={handleDeleteRecipe}
+              onSaveRecipe={handleSaveRecipe}
               testResults={testResults}
               mixingSessions={mixingSessions.filter(s => s.recipeId === selectedRecipe.id)}
               onSaveTestResult={handleSaveTestResult}
@@ -601,6 +612,8 @@ function App() {
               onToggleFavourite={handleToggleFavourite}
               onDeleteRecipe={handleDeleteRecipe}
               onEditRecipe={handleEditRecipe}
+              testResults={testResults}
+              materials={materials}
             />
           </BlockStack>
         </Page>
