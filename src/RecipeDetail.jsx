@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import TestResultForm from './TestResultForm'
 import DriveImage from './DriveImage'
+import { getStockStatus, toGrams } from './materials'
+import { getCompatibilityWarnings } from './clayBodies'
 import './RecipeDetail.css'
 
 const GLAZE_TYPE_COLORS = {
@@ -27,7 +29,79 @@ const StarDisplay = ({ value }) => (
   </div>
 )
 
-export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, testResults, mixingSessions, onSaveTestResult, onDeleteTestResult, accessToken, photosFolderId }) {
+function IngredientStockBadge({ name, percent, batchGrams, materials }) {
+  const mat = (materials || []).find(m => m.name.toLowerCase() === name?.toLowerCase())
+  if (!mat) return null
+
+  const status = getStockStatus(mat)
+  if (!status || status === 'ok') return null
+
+  if (status === 'out') {
+    return <span className="ing-stock-badge out">Out</span>
+  }
+  if (status === 'low') {
+    return <span className="ing-stock-badge low">Low</span>
+  }
+  return null
+}
+
+function CompatibilityWarnings({ recipe, clayBodies, testResults }) {
+  if (!clayBodies?.length) return null
+
+  const allWarnings = []
+
+  clayBodies.forEach(cb => {
+    // Chemistry warnings
+    const chemWarnings = getCompatibilityWarnings(recipe, cb)
+    chemWarnings.forEach(w => {
+      allWarnings.push({ ...w, clayBody: cb.name, source: 'chemistry' })
+    })
+
+    // Rating-based warnings from test results
+    const recipeSlug = recipe.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    const relevantResults = (testResults || []).filter(r =>
+      r.recipeSlug === recipeSlug &&
+      r.clayBody?.toLowerCase() === cb.name.toLowerCase() &&
+      r.status === 'completed' &&
+      r.rating > 0 &&
+      r.rating <= 2
+    )
+
+    relevantResults.forEach(result => {
+      allWarnings.push({
+        type: 'experience',
+        severity: result.rating === 1 ? 'high' : 'medium',
+        clayBody: cb.name,
+        source: 'rating',
+        message: `Rated ${result.rating}★ on ${cb.name} (${result.date}).${result.notesAfter ? ` Note: ${result.notesAfter}` : ''}`
+      })
+    })
+  })
+
+  if (!allWarnings.length) return null
+
+  return (
+    <div className="detail-section">
+      <h2 className="section-title">Compatibility Warnings</h2>
+      {allWarnings.map((w, i) => (
+        <div key={i} className={`compat-warning ${w.severity}`}>
+          <div className="compat-warning-header">
+            <span className="compat-clay-body">{w.clayBody}</span>
+            <span className={`compat-badge ${w.severity}`}>
+              {w.severity === 'high' ? '⚠ High' : '! Medium'}
+            </span>
+            <span className="compat-source">
+              {w.source === 'chemistry' ? 'Chemistry' : 'Experience'}
+            </span>
+          </div>
+          <div className="compat-warning-msg">{w.message}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, testResults, mixingSessions, onSaveTestResult, onDeleteTestResult, accessToken, photosFolderId, materials, clayBodies }) {
   const [showStull, setShowStull] = useState(false)
   const [showTestForm, setShowTestForm] = useState(false)
   const [editingResult, setEditingResult] = useState(null)
@@ -216,6 +290,13 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
         </div>
       </div>
 
+      {/* Compatibility warnings */}
+      <CompatibilityWarnings
+        recipe={recipe}
+        clayBodies={clayBodies}
+        testResults={testResults}
+      />
+
       {/* Test Results carousel */}
       <div className="detail-section">
         <div className="section-header-row">
@@ -305,7 +386,14 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
           <tbody>
             {(recipe.baseIngredients || []).map((ing, i) => (
               <tr key={i} className="ing-row">
-                <td className="ing-td">{ing.material}</td>
+                <td className="ing-td">
+                  <span>{ing.material}</span>
+                  <IngredientStockBadge
+                    name={ing.material}
+                    percent={ing.percent}
+                    materials={materials}
+                  />
+                </td>
                 <td className="ing-td ing-td-right">{ing.percent}%</td>
               </tr>
             ))}
@@ -327,7 +415,14 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, tes
             <tbody>
               {recipe.additives.filter(a => a.material).map((add, i) => (
                 <tr key={i} className="ing-row">
-                  <td className="ing-td">{add.material}</td>
+                  <td className="ing-td">
+                    <span>{add.material}</span>
+                    <IngredientStockBadge
+                      name={add.material}
+                      percent={add.percent}
+                      materials={materials}
+                    />
+                  </td>
                   <td className="ing-td ing-td-right">{add.percent}%</td>
                 </tr>
               ))}

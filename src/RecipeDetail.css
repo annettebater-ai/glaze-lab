@@ -423,3 +423,89 @@
   padding: 0;
   flex-shrink: 0;
 }
+/* ── Stock badges on ingredients ── */
+.ing-stock-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  margin-left: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.ing-stock-badge.out {
+  background: #fff0f0;
+  color: #cc2200;
+  border: 1px solid #ffcccc;
+}
+
+.ing-stock-badge.low {
+  background: #fff8e1;
+  color: #aa7700;
+  border: 1px solid #ffe082;
+}
+
+/* ── Compatibility warnings ── */
+.compat-warning {
+  padding: 12px 14px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  border-left: 4px solid;
+}
+
+.compat-warning.high {
+  background: #fff5f5;
+  border-color: #cc2200;
+}
+
+.compat-warning.medium {
+  background: #fffbf0;
+  border-color: #aa7700;
+}
+
+.compat-warning-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.compat-clay-body {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.compat-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.compat-badge.high {
+  background: #cc2200;
+  color: white;
+}
+
+.compat-badge.medium {
+  background: #aa7700;
+  color: white;
+}
+
+.compat-source {
+  font-size: 11px;
+  color: #888;
+  background: #f0f0f0;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.compat-warning-msg {
+  font-size: 13px;
+  color: #444;
+  line-height: 1.5;
+}

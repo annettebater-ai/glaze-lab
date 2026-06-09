@@ -55,9 +55,8 @@ export default function TestResultForm({ recipe, mixingSessions, existingResult,
   const [clayBody, setClayBody] = useState(existing.clayBody || '')
   const [applicationMethod, setApplicationMethod] = useState(existing.applicationMethod || 'dipping')
   const [thickness, setThickness] = useState(existing.thickness || 'medium')
-  const [mixingSessionId, setMixingSessionId] = useState(
-    existing.mixingSessionId || mixingSessions?.[0]?.id || 'none'
-  )
+  const [numDips, setNumDips] = useState(existing.numDips ? String(existing.numDips) : '')
+  const [dipDuration, setDipDuration] = useState(existing.dipDuration ? String(existing.dipDuration) : '')
   const [layers, setLayers] = useState(
     existing.layers?.length > 0
       ? existing.layers
@@ -121,10 +120,11 @@ export default function TestResultForm({ recipe, mixingSessions, existingResult,
       ...(isEditing ? existing : {}),
       recipeSlug: recipe.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       recipeName: recipe.name,
-      mixingSessionId: mixingSessionId === 'none' ? null : mixingSessionId,
       clayBody,
       applicationMethod,
       thickness,
+      numDips: numDips ? parseInt(numDips) : null,
+      dipDuration: dipDuration ? parseInt(dipDuration) : null,
       layers,
       status,
       notesBefore,
@@ -136,14 +136,6 @@ export default function TestResultForm({ recipe, mixingSessions, existingResult,
       id: existing.id || Date.now().toString(),
     })
   }
-
-  const sessionOptions = [
-    { label: 'No session / added manually', value: 'none' },
-    ...(mixingSessions || []).map(s => ({
-      label: `${s.date} — ${s.batchSize}${s.unit} batch`,
-      value: s.id
-    }))
-  ]
 
   return (
     <div className="test-result-form">
@@ -166,19 +158,6 @@ export default function TestResultForm({ recipe, mixingSessions, existingResult,
                 id="status-completed"
               />
             </InlineStack>
-          </BlockStack>
-        </Card>
-
-        <Card>
-          <BlockStack gap="300">
-            <Text variant="headingSm">Mixing Session</Text>
-            <Select
-              label="Mixing session"
-              labelHidden
-              options={sessionOptions}
-              value={mixingSessionId}
-              onChange={setMixingSessionId}
-            />
           </BlockStack>
         </Card>
 
@@ -211,6 +190,31 @@ export default function TestResultForm({ recipe, mixingSessions, existingResult,
                 />
               </div>
             </InlineStack>
+            {applicationMethod === 'dipping' && (
+              <InlineStack gap="300">
+                <div style={{flex: 1}}>
+                  <TextField
+                    label="Number of dips"
+                    type="number"
+                    placeholder="e.g. 2"
+                    value={numDips}
+                    onChange={setNumDips}
+                    autoComplete="off"
+                  />
+                </div>
+                <div style={{flex: 1}}>
+                  <TextField
+                    label="Dip duration (seconds)"
+                    type="number"
+                    placeholder="e.g. 3"
+                    value={dipDuration}
+                    onChange={setDipDuration}
+                    autoComplete="off"
+                    helpText="seconds per dip"
+                  />
+                </div>
+              </InlineStack>
+            )}
           </BlockStack>
         </Card>
 
