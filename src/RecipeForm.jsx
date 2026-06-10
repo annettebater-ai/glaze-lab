@@ -1,6 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { analyseRecipe, MATERIALS as CHEMISTRY_MATERIALS } from './chemistry'
-import { Modal, BlockStack, Text, TextField, Select, InlineStack } from '@shopify/polaris'
+import {
+  Modal, BlockStack, Text, TextField, Select, InlineStack,
+  Combobox, Listbox,
+} from '@shopify/polaris'
 import StullChart from './StullChart'
 import './RecipeForm.css'
 
@@ -32,72 +35,91 @@ const UNITS = [
   { label: 'ounces (oz)', value: 'oz' },
 ]
 
-// Autocomplete ingredient input
-function IngredientAutocomplete({ value, onChange, materials, placeholder }) {
-  const [query, setQuery] = useState(value || '')
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
+function IngredientCombobox({ value, onChange, onBlur, materials, placeholder }) {
+  const [inputValue, setInputValue] = useState(value || '')
+  const [options, setOptions] = useState([])
 
-  useEffect(() => { setQuery(value || '') }, [value])
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
+  useEffect(() => { setInputValue(value || '') }, [value])
 
   const libraryNames = (materials || []).map(m => m.name)
   const chemNames = Object.keys(CHEMISTRY_MATERIALS)
   const allNames = [...new Set([...libraryNames, ...chemNames])].sort()
 
-  const filtered = query.length > 0
-    ? allNames.filter(n => n.toLowerCase().includes(query.toLowerCase()))
-    : []
+  const inLibrary = (name) =>
+    libraryNames.some(n => n.toLowerCase() === name.toLowerCase())
 
-  const inLibrary = (name) => libraryNames.some(n => n.toLowerCase() === name.toLowerCase())
+  const updateOptions = useCallback((query) => {
+    const q = query.toLowerCase()
+    const filtered = q
+      ? allNames.filter(n => n.toLowerCase().includes(q))
+      : allNames.slice(0, 10)
+    setOptions(filtered)
+  }, [allNames.join(',')])
 
-  const handleSelect = (name) => {
-    setQuery(name)
-    onChange(name)
-    setOpen(false)
-  }
-
-  const handleChange = (val) => {
-    setQuery(val)
+  const handleInputChange = (val) => {
+    setInputValue(val)
     onChange(val)
-    setOpen(true)
+    updateOptions(val)
   }
+
+  const handleSelect = (selected) => {
+    setInputValue(selected)
+    onChange(selected)
+    setOptions([])
+    if (onBlur) onBlur(selected)
+  }
+
+  const handleFocus = () => {
+    updateOptions(inputValue)
+  }
+
+  const optionsMarkup = options.length > 0
+    ? options.map(name => (
+        <Listbox.Option key={name} value={name}>
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0'}}>
+            <span>{name}</span>
+            {!inLibrary(name) && (
+              <span style={{
+                fontSize: '11px',
+                color: '#aa7700',
+                background: '#fff8e1',
+                border: '1px solid #ffe082',
+                padding: '1px 7px',
+                borderRadius: '8px',
+                fontWeight: 600,
+                marginLeft: '8px',
+                flexShrink: 0,
+              }}>
+                not in library
+              </span>
+            )}
+          </div>
+        </Listbox.Option>
+      ))
+    : null
 
   return (
-    <div ref={ref} style={{position: 'relative', flex: 1}}>
-      <input
-        className="form-input material-input"
-        type="text"
-        placeholder={placeholder || 'Search materials...'}
-        value={query}
-        onChange={e => handleChange(e.target.value)}
-        onFocus={() => query.length > 0 && setOpen(true)}
-        autoComplete="off"
-      />
-      {open && filtered.length > 0 && (
-        <div className="material-dropdown">
-          {filtered.slice(0, 8).map(name => (
-            <button
-              key={name}
-              type="button"
-              className="material-dropdown-item"
-              onClick={() => handleSelect(name)}
-            >
-              <span>{name}</span>
-              {!inLibrary(name) && (
-                <span className="not-in-library">not in library</span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
+    <div style={{flex: 1}}>
+      <Combobox
+        activator={
+          <Combobox.TextField
+            label="Material"
+            labelHidden
+            value={inputValue}
+            onChange={handleInputChange}
+            onFocus={handleFocus}
+            onBlur={() => onBlur && onBlur(inputValue)}
+            placeholder={placeholder || 'Search materials...'}
+            autoComplete="off"
+          />
+        }
+      >
+        {optionsMarkup ? (
+          <Listbox onSelect={handleSelect}>
+            {optionsMarkup}
+          </Listbox>
+        ) : null}
+      </Combobox>
     </div>
   )
 }
@@ -125,13 +147,11 @@ function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
   const [showStull, setShowStull] = useState(false)
   const [notes, setNotes] = useState(recipe?.notes || '')
 
-  // Add to library modal
   const [addMaterialModal, setAddMaterialModal] = useState(false)
   const [pendingMaterialName, setPendingMaterialName] = useState('')
   const [newMatAmount, setNewMatAmount] = useState('0')
   const [newMatUnit, setNewMatUnit] = useState('g')
   const [newMatApprox, setNewMatApprox] = useState(false)
-  const [pendingIngredient, setPendingIngredient] = useState(null) // { section, index, name }
 
   useEffect(() => {
     const valid = baseIngredients.filter(i => i.material && parseFloat(i.percent) > 0)
@@ -150,69 +170,39 @@ function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
     }
   }, [baseIngredients])
 
-  const addBaseIngredient = () => {
+  const checkAndPromptAdd = (name) => {
+    if (!name?.trim()) return
+    const inLibrary = (materials || []).some(
+      m => m.name.toLowerCase() === name.toLowerCase()
+    )
+    if (!inLibrary) {
+      setPendingMaterialName(name)
+      setAddMaterialModal(true)
+    }
+  }
+
+  const addBaseIngredient = () =>
     setBaseIngredients([...baseIngredients, { material: '', percent: '' }])
-  }
 
-  const removeBaseIngredient = (index) => {
+  const removeBaseIngredient = (index) =>
     setBaseIngredients(baseIngredients.filter((_, i) => i !== index))
-  }
 
-  const handleBaseIngredientChange = (index, field, value) => {
+  const updateBaseIngredient = (index, field, value) => {
     const updated = [...baseIngredients]
     updated[index] = { ...updated[index], [field]: value }
     setBaseIngredients(updated)
-
-    // Check if material is in library when name changes
-    if (field === 'material' && value) {
-      const inLibrary = (materials || []).some(
-        m => m.name.toLowerCase() === value.toLowerCase()
-      )
-      const inChemistry = Object.keys(CHEMISTRY_MATERIALS).some(
-        m => m.toLowerCase() === value.toLowerCase()
-      )
-      if (!inLibrary && inChemistry === false && value.trim().length > 2) {
-        // Will be caught on save
-      }
-    }
   }
 
-  const handleBaseIngredientBlur = (index, value) => {
-    if (!value || !value.trim()) return
-    const inLibrary = (materials || []).some(
-      m => m.name.toLowerCase() === value.toLowerCase()
-    )
-    if (!inLibrary) {
-      setPendingMaterialName(value)
-      setPendingIngredient({ section: 'base', index })
-      setAddMaterialModal(true)
-    }
-  }
-
-  const addAdditive = () => {
+  const addAdditive = () =>
     setAdditives([...additives, { material: '', percent: '' }])
-  }
 
-  const removeAdditive = (index) => {
+  const removeAdditive = (index) =>
     setAdditives(additives.filter((_, i) => i !== index))
-  }
 
-  const handleAdditiveChange = (index, field, value) => {
+  const updateAdditive = (index, field, value) => {
     const updated = [...additives]
     updated[index] = { ...updated[index], [field]: value }
     setAdditives(updated)
-  }
-
-  const handleAdditiveBlur = (index, value) => {
-    if (!value || !value.trim()) return
-    const inLibrary = (materials || []).some(
-      m => m.name.toLowerCase() === value.toLowerCase()
-    )
-    if (!inLibrary) {
-      setPendingMaterialName(value)
-      setPendingIngredient({ section: 'additive', index })
-      setAddMaterialModal(true)
-    }
   }
 
   const handleAddMaterialConfirm = () => {
@@ -232,7 +222,6 @@ function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
     setNewMatAmount('0')
     setNewMatUnit('g')
     setNewMatApprox(false)
-    setPendingIngredient(null)
   }
 
   const baseTotal = baseIngredients.reduce((sum, i) => sum + (parseFloat(i.percent) || 0), 0)
@@ -274,7 +263,6 @@ function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
   return (
     <div className="recipe-form">
 
-      {/* Recipe Type */}
       <div className="form-section">
         <label className="form-label">Recipe Type</label>
         <div className="type-pills">
@@ -289,7 +277,6 @@ function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
         </div>
       </div>
 
-      {/* Name */}
       <div className="form-section">
         <label className="form-label">Recipe Name</label>
         <input
@@ -301,7 +288,6 @@ function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
         />
       </div>
 
-      {/* Cone + Atmosphere */}
       <div className="form-row">
         <div className="form-section half">
           <label className="form-label">Cone</label>
@@ -321,7 +307,6 @@ function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
         </div>
       </div>
 
-      {/* Status */}
       <div className="form-section">
         <label className="form-label">Status</label>
         <select className="form-select" value={status} onChange={e => setStatus(e.target.value)}>
@@ -331,7 +316,6 @@ function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
         </select>
       </div>
 
-      {/* Tabs */}
       <div className="form-tabs">
         <button
           type="button"
@@ -347,7 +331,6 @@ function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
 
       {activeTab === 'details' && (
         <>
-          {/* Base Glaze */}
           <div className="form-section">
             <div className="section-header">
               <label className="form-label">Base</label>
@@ -357,19 +340,19 @@ function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
             </div>
             {baseIngredients.map((ing, index) => (
               <div key={index} className="ingredient-row">
-                <IngredientAutocomplete
+                <IngredientCombobox
                   value={ing.material}
                   materials={materials}
-                  placeholder="Search or add material..."
-                  onChange={(val) => handleBaseIngredientChange(index, 'material', val)}
-                  onBlur={() => handleBaseIngredientBlur(index, ing.material)}
+                  placeholder="Search materials..."
+                  onChange={(val) => updateBaseIngredient(index, 'material', val)}
+                  onBlur={(val) => checkAndPromptAdd(val)}
                 />
                 <input
                   className="form-input parts-input"
                   type="number"
                   placeholder="0"
                   value={ing.percent}
-                  onChange={e => handleBaseIngredientChange(index, 'percent', e.target.value)}
+                  onChange={e => updateBaseIngredient(index, 'percent', e.target.value)}
                 />
                 <span className="normalised-pct">
                   {getNormalisedPercent(ing.percent) ? `${getNormalisedPercent(ing.percent)}%` : '—'}
@@ -388,7 +371,6 @@ function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
             >+ Add Ingredient</button>
           </div>
 
-          {/* Additives */}
           <div className="form-section">
             <div className="section-header">
               <label className="form-label">Additives</label>
@@ -396,19 +378,19 @@ function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
             </div>
             {additives.map((add, index) => (
               <div key={index} className="ingredient-row">
-                <IngredientAutocomplete
+                <IngredientCombobox
                   value={add.material}
                   materials={materials}
-                  placeholder="Search or add material..."
-                  onChange={(val) => handleAdditiveChange(index, 'material', val)}
-                  onBlur={() => handleAdditiveBlur(index, add.material)}
+                  placeholder="Search materials..."
+                  onChange={(val) => updateAdditive(index, 'material', val)}
+                  onBlur={(val) => checkAndPromptAdd(val)}
                 />
                 <input
                   className="form-input parts-input"
                   type="number"
                   placeholder="0"
                   value={add.percent}
-                  onChange={e => handleAdditiveChange(index, 'percent', e.target.value)}
+                  onChange={e => updateAdditive(index, 'percent', e.target.value)}
                 />
                 <span className="normalised-pct"></span>
                 <button
@@ -425,7 +407,6 @@ function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
             >+ Add Additive</button>
           </div>
 
-          {/* Live Chemistry */}
           {chemistry && (
             <div className="chemistry-panel">
               <h3 className="chemistry-title">Live Chemistry</h3>
@@ -507,7 +488,6 @@ function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
             </div>
           )}
 
-          {/* Notes */}
           <div className="form-section">
             <label className="form-label">Notes</label>
             <textarea
@@ -536,7 +516,6 @@ function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
         </div>
       )}
 
-      {/* Actions */}
       <div className="form-actions">
         <button type="button" className="cancel-btn" onClick={onCancel}>Cancel</button>
         <button type="button" className="save-btn" onClick={handleSave}>
@@ -544,45 +523,40 @@ function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
         </button>
       </div>
 
-      {/* Add to library modal */}
       <Modal
         open={addMaterialModal}
         onClose={() => setAddMaterialModal(false)}
-        title={`Add "${pendingMaterialName}" to Materials`}
+        title={`Add "${pendingMaterialName}" to your Materials library`}
         primaryAction={{
           content: 'Add to Library',
           onAction: handleAddMaterialConfirm
         }}
         secondaryActions={[{
-          content: 'Skip',
+          content: 'Skip for now',
           onAction: () => setAddMaterialModal(false)
         }]}
       >
         <Modal.Section>
           <BlockStack gap="400">
             <Text tone="subdued">
-              This material isn't in your library yet. Add it now so inventory can be tracked.
+              This material isn't in your library yet. Add it now so inventory can be tracked. You can update the amount later.
             </Text>
-            <InlineStack gap="300" blockAlign="end">
-              <div style={{flex: 1}}>
-                <TextField
-                  label="Amount on hand"
-                  type="number"
-                  value={newMatAmount}
-                  onChange={setNewMatAmount}
-                  autoComplete="off"
-                  helpText="Set to 0 if you haven't measured it yet"
-                />
-              </div>
-              <div style={{flex: 1}}>
-                <Select
-                  label="Unit"
-                  options={UNITS}
-                  value={newMatUnit}
-                  onChange={setNewMatUnit}
-                />
-              </div>
-            </InlineStack>
+            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignItems: 'start'}}>
+              <TextField
+                label="Amount on hand"
+                type="number"
+                value={newMatAmount}
+                onChange={setNewMatAmount}
+                autoComplete="off"
+                helpText="Enter 0 if unknown"
+              />
+              <Select
+                label="Unit"
+                options={UNITS}
+                value={newMatUnit}
+                onChange={setNewMatUnit}
+              />
+            </div>
             <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
               <input
                 type="checkbox"

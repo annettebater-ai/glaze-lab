@@ -14,6 +14,7 @@ import RecipeDetail from './RecipeDetail'
 import MixingSession from './MixingSession'
 import MaterialsScreen from './MaterialsScreen'
 import ClayBodiesScreen from './ClayBodiesScreen'
+import TestsScreen from './TestsScreen'
 import {
   ensureVaultStructure,
   listFiles,
@@ -142,7 +143,7 @@ function App() {
       setVaultFolders(folders)
       setStatusMessage('Loading recipes...')
       await loadRecipes(token, folders.recipes)
-      setStatusMessage('Loading test results...')
+      setStatusMessage('Loading tests...')
       await loadTestResults(token, folders.testResults)
       setStatusMessage('Loading materials...')
       await loadMaterials(token, folders.materials)
@@ -258,9 +259,7 @@ function App() {
         }
       }
       setRecipes(prev => [newRecipe, ...prev.filter(r => r.id !== newRecipe.id)])
-      if (selectedRecipe?.id === newRecipe.id) {
-        setSelectedRecipe(newRecipe)
-      }
+      if (selectedRecipe?.id === newRecipe.id) setSelectedRecipe(newRecipe)
       setShowNewRecipe(false)
       setEditingRecipe(null)
       setStatusMessage('Saved')
@@ -275,7 +274,7 @@ function App() {
   const handleSaveTestResult = async (resultData) => {
     if (!accessToken || !vaultFolders) { alert('Not connected to Drive'); return }
     try {
-      setStatusMessage('Saving test result...')
+      setStatusMessage('Saving...')
       const filename = `${resultData.recipeSlug}-${resultData.id}.md`
       const content = testResultToMarkdown(resultData)
       if (resultData.fileId) {
@@ -314,7 +313,7 @@ function App() {
   const handleSaveMaterial = async (materialData) => {
     if (!accessToken || !vaultFolders) { alert('Not connected to Drive'); return }
     try {
-      setStatusMessage('Saving material...')
+      setStatusMessage('Saving...')
       const filename = materialData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + materialData.id + '.md'
       const content = materialToMarkdown(materialData)
       if (materialData.fileId) {
@@ -353,7 +352,7 @@ function App() {
   const handleSaveClayBody = async (clayBodyData) => {
     if (!accessToken || !vaultFolders) { alert('Not connected to Drive'); return }
     try {
-      setStatusMessage('Saving clay body...')
+      setStatusMessage('Saving...')
       const filename = clayBodyData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + clayBodyData.id + '.md'
       const content = clayBodyToMarkdown(clayBodyData)
       if (clayBodyData.fileId) {
@@ -566,9 +565,6 @@ function App() {
           <Page
             title={selectedRecipe.name}
             backAction={{ content: 'Recipes', onAction: () => setSelectedRecipe(null) }}
-            secondaryActions={[
-              { content: 'Edit', onAction: () => handleEditRecipe(selectedRecipe) }
-            ]}
           >
             <RecipeDetail
               recipe={selectedRecipe}
@@ -576,6 +572,7 @@ function App() {
               onStartMix={(recipe) => setMixingRecipe(recipe)}
               onDelete={handleDeleteRecipe}
               onSaveRecipe={handleSaveRecipe}
+              onEditRecipe={handleEditRecipe}
               testResults={testResults}
               mixingSessions={mixingSessions.filter(s => s.recipeId === selectedRecipe.id)}
               onSaveTestResult={handleSaveTestResult}
@@ -590,7 +587,7 @@ function App() {
       }
       return (
         <Page
-          title="My Recipes"
+          title="Recipes"
           primaryAction={{
             content: 'New Recipe',
             onAction: () => {
@@ -621,37 +618,15 @@ function App() {
     }
 
     if (currentScreen === 'tests') {
-      const sortedResults = [...testResults].sort((a, b) => new Date(b.date) - new Date(a.date))
       return (
-        <Page title="Test Results">
-          {sortedResults.length === 0 ? (
-            <Card>
-              <Text tone="subdued">No test results yet. Open a recipe and add a result after firing.</Text>
-            </Card>
-          ) : (
-            <BlockStack gap="300">
-              {sortedResults.map((result, i) => (
-                <Card key={i}>
-                  <InlineStack align="space-between">
-                    <BlockStack gap="100">
-                      <Text variant="headingSm">{result.recipeName}</Text>
-                      <Text variant="bodySm" tone="subdued">
-                        {result.date} · {result.clayBody}
-                      </Text>
-                    </BlockStack>
-                    <div style={{display: 'flex', alignItems: 'center'}}>
-                      {result.status === 'pending' ? (
-                        <span style={{fontSize: '13px', color: '#aa7700', fontWeight: 600}}>⏳ Pending</span>
-                      ) : (
-                        <span style={{fontSize: '13px', color: '#1a7a1a', fontWeight: 600}}>✓ Completed</span>
-                      )}
-                    </div>
-                  </InlineStack>
-                </Card>
-              ))}
-            </BlockStack>
-          )}
-        </Page>
+        <TestsScreen
+          testResults={testResults}
+          recipes={recipes}
+          onSaveTestResult={handleSaveTestResult}
+          onDeleteTestResult={handleDeleteTestResult}
+          accessToken={accessToken}
+          photosFolderId={vaultFolders?.photos}
+        />
       )
     }
 

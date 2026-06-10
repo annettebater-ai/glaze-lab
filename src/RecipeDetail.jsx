@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import TestResultForm from './TestResultForm'
 import DriveImage from './DriveImage'
 import StullChart from './StullChart'
-import { getStockStatus, toGrams } from './materials'
+import { getStockStatus } from './materials'
 import { getCompatibilityWarnings } from './clayBodies'
 import './RecipeDetail.css'
 
@@ -97,7 +97,6 @@ function InlineNameEditor({ name, onSave }) {
   const inputRef = useRef(null)
 
   useEffect(() => { setValue(name) }, [name])
-
   useEffect(() => {
     if (editing && inputRef.current) inputRef.current.focus()
   }, [editing])
@@ -146,7 +145,7 @@ function InlineNameEditor({ name, onSave }) {
   )
 }
 
-export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onSaveRecipe, testResults, mixingSessions, onSaveTestResult, onDeleteTestResult, accessToken, photosFolderId, materials, clayBodies }) {
+export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onSaveRecipe, onEditRecipe, testResults, mixingSessions, onSaveTestResult, onDeleteTestResult, accessToken, photosFolderId, materials, clayBodies }) {
   const [showStull, setShowStull] = useState(false)
   const [showTestForm, setShowTestForm] = useState(false)
   const [editingResult, setEditingResult] = useState(null)
@@ -171,9 +170,7 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onS
     .filter(ox => unity[ox] > 0.001)
 
   const handleNameSave = (newName) => {
-    if (onSaveRecipe) {
-      onSaveRecipe({ ...recipe, name: newName })
-    }
+    if (onSaveRecipe) onSaveRecipe({ ...recipe, name: newName })
   }
 
   if (showTestForm || editingResult) {
@@ -330,9 +327,23 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onS
       <div className="detail-title-block">
         <div className="detail-type-row">
           <div className="detail-type">{recipe.recipeType}</div>
-          <button className="detail-mix-btn" onClick={() => onStartMix(recipe)}>
-            Start Mixing
-          </button>
+          <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+            {onEditRecipe && (
+              <button
+                className="detail-mix-btn"
+                style={{background: '#555'}}
+                onClick={() => onEditRecipe(recipe)}
+              >
+                Edit
+              </button>
+            )}
+            <button
+              className="detail-mix-btn"
+              onClick={() => onStartMix(recipe)}
+            >
+              Start Mixing
+            </button>
+          </div>
         </div>
         <InlineNameEditor name={recipe.name} onSave={handleNameSave} />
         <div className="detail-meta">
