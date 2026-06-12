@@ -57,19 +57,20 @@ async function ensureFolder(token, name, parentId = null) {
 
 export async function ensureVaultStructure(token) {
   const rootId = await ensureFolder(token, VAULT_NAME)
-  const [recipes, clayBodies, testResults, mixingSessions, materials, assets] = await Promise.all([
+  const [recipes, clayBodies, testResults, mixingSessions, materials, glazeInventory, assets] = await Promise.all([
     ensureFolder(token, 'Recipes', rootId),
     ensureFolder(token, 'Clay Bodies', rootId),
     ensureFolder(token, 'Test Results', rootId),
     ensureFolder(token, 'Mixing Sessions', rootId),
     ensureFolder(token, 'Materials', rootId),
+    ensureFolder(token, 'Glaze Inventory', rootId),
     ensureFolder(token, 'Assets', rootId),
   ])
   const [charts, photos] = await Promise.all([
     ensureFolder(token, 'charts', assets),
     ensureFolder(token, 'photos', assets),
   ])
-  return { rootId, recipes, clayBodies, testResults, mixingSessions, materials, assets, charts, photos }
+  return { rootId, recipes, clayBodies, testResults, mixingSessions, materials, glazeInventory, assets, charts, photos }
 }
 
 export async function listFiles(token, folderId) {

@@ -15,6 +15,7 @@ import MixingSession from './MixingSession'
 import MaterialsScreen from './MaterialsScreen'
 import ClayBodiesScreen from './ClayBodiesScreen'
 import TestsScreen from './TestsScreen'
+import GlazeInventoryScreen from './GlazeInventoryScreen'
 import {
   ensureVaultStructure,
   listFiles,
@@ -28,6 +29,7 @@ import {
 import { testResultToMarkdown, markdownToTestResult } from './testResults'
 import { materialToMarkdown, markdownToMaterial, toGrams, fromGrams } from './materials'
 import { clayBodyToMarkdown, markdownToClayBody } from './clayBodies'
+import { glazeInventoryToMarkdown, markdownToGlazeInventory } from './glazeInventory'
 import { DEFAULT_OBJECT_TYPES } from './objectTypes'
 import './App.css'
 
@@ -66,6 +68,7 @@ const SearchIcon = () => (
 )
 
 const NAV_ITEMS = [
+  { id: 'glaze-inventory', label: 'Glaze Inventory' },
   { id: 'recipes', label: 'Recipes' },
   { id: 'tests', label: 'Tests' },
   { id: 'clay-bodies', label: 'Clay Bodies' },
@@ -77,7 +80,7 @@ function App() {
   const [userName, setUserName] = useState('')
   const [userEmail, setUserEmail] = useState('')
   const [loading, setLoading] = useState(true)
-  const [currentScreen, setCurrentScreen] = useState('recipes')
+  const [currentScreen, setCurrentScreen] = useState('glaze-inventory')
   const [accessToken, setAccessToken] = useState(null)
   const [showNewRecipe, setShowNewRecipe] = useState(false)
   const [editingRecipe, setEditingRecipe] = useState(null)
@@ -87,6 +90,7 @@ function App() {
   const [materials, setMaterials] = useState([])
   const [clayBodies, setClayBodies] = useState([])
   const [objectTypes, setObjectTypes] = useState(DEFAULT_OBJECT_TYPES)
+  const [glazeInventory, setGlazeInventory] = useState([])
   const [vaultFolders, setVaultFolders] = useState(null)
   const [statusMessage, setStatusMessage] = useState('')
   const [selectedRecipe, setSelectedRecipe] = useState(null)
@@ -151,6 +155,8 @@ function App() {
       await loadMaterials(token, folders.materials)
       setStatusMessage('Loading clay bodies...')
       await loadClayBodies(token, folders.clayBodies)
+      setStatusMessage('Loading glaze inventory...')
+      await loadGlazeInventory(token, folders.glazeInventory)
       setStatusMessage('')
     } catch (error) {
       console.error('Vault init error:', error)
@@ -228,6 +234,24 @@ function App() {
       setClayBodies(loaded.filter(Boolean))
     } catch (error) {
       console.error('Failed to load clay bodies:', error)
+    }
+  }
+
+  const loadGlazeInventory = async (token, folderId) => {
+    if (!folderId) return
+    try {
+      const files = await listFiles(token, folderId)
+      const loaded = await Promise.all(
+        files.map(async (file) => {
+          try {
+            const content = await readFile(token, file.id)
+            return markdownToGlazeInventory(content, file.id)
+          } catch (e) { return null }
+        })
+      )
+      setGlazeInventory(loaded.filter(Boolean))
+    } catch (error) {
+      console.error('Failed to load glaze inventory:', error)
     }
   }
 
@@ -402,18 +426,52 @@ function App() {
     setObjectTypes(prev => prev.filter(o => o.id !== objectType.id))
   }
 
+  const handleSaveGlazeInventoryEntry = async (entry) => {
+    if (!accessToken || !vaultFolders) return
+    try {
+      const filename = `${entry.recipeSlug}-${entry.id}.md`
+      const content = glazeInventoryToMarkdown(entry)
+      if (entry.fileId) {
+        await updateFile(accessToken, entry.fileId, content)
+        setGlazeInventory(prev => prev.map(e => e.id === entry.id ? entry : e))
+      } else {
+        const created = await createFile(accessToken, vaultFolders.glazeInventory, filename, content)
+        entry.fileId = created.id
+        setGlazeInventory(prev => {
+          const exists = prev.find(e => e.id === entry.id)
+          if (exists) return prev.map(e => e.id === entry.id ? entry : e)
+          return [entry, ...prev]
+        })
+      }
+    } catch (error) {
+      console.error('Save glaze inventory error:', error)
+    }
+  }
+
+  const handleDeleteGlazeInventoryEntry = async (entry) => {
+    if (entry.fileId && accessToken) {
+      try {
+        await fetch(
+          `https://www.googleapis.com/drive/v3/files/${entry.fileId}`,
+          { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } }
+        )
+      } catch (e) { console.error('Delete glaze inventory entry failed:', e) }
+    }
+    setGlazeInventory(prev => prev.filter(e => e.id !== entry.id))
+  }
+
   const handleSessionComplete = async (sessionData) => {
     const recipe = sessionData.recipe
     const batchGrams = sessionData.batchGrams
     if (!batchGrams || !recipe) return
 
+    // Deduct materials
     const allIngredients = [
       ...(recipe.baseIngredients || []),
       ...(recipe.additives || [])
     ].filter(i => i.material)
 
     const updatedMaterials = [...materials]
-
     for (const ing of allIngredients) {
       const usedGrams = batchGrams * ing.percent / 100
       const matIndex = updatedMaterials.findIndex(
@@ -432,8 +490,27 @@ function App() {
         await handleSaveMaterial(updatedMaterials[matIndex])
       }
     }
-
     setMaterials(updatedMaterials)
+
+    // Auto-create glaze inventory entry
+    const inventoryEntry = {
+      id: sessionData.id || Date.now().toString(),
+      recipeId: recipe.id,
+      recipeSlug: recipe.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      recipeName: recipe.name,
+      dateMixed: sessionData.date,
+      batchSize: sessionData.batchSize,
+      batchUnit: sessionData.unit,
+      batchGrams: sessionData.batchGrams,
+      batchCost: sessionData.batchCost || null,
+      batchCostEstimated: sessionData.batchCostEstimated || false,
+      sg: sessionData.sgMeasured || null,
+      isLow: false,
+      isUsedUp: false,
+      notes: sessionData.notes || '',
+    }
+    await handleSaveGlazeInventoryEntry(inventoryEntry)
+
     setMixingSessions(prev => [sessionData, ...prev])
     setMixingRecipe(null)
     setSelectedRecipe(null)
@@ -497,6 +574,7 @@ function App() {
     setMaterials([])
     setClayBodies([])
     setObjectTypes(DEFAULT_OBJECT_TYPES)
+    setGlazeInventory([])
     setSelectedRecipe(null)
     setMixingRecipe(null)
     setEditingRecipe(null)
@@ -546,6 +624,23 @@ function App() {
           objectTypes={objectTypes}
           onComplete={handleSessionComplete}
           onCancel={() => setMixingRecipe(null)}
+        />
+      )
+    }
+
+    if (currentScreen === 'glaze-inventory') {
+      return (
+        <GlazeInventoryScreen
+          glazeInventory={glazeInventory}
+          recipes={recipes}
+          testResults={testResults}
+          accessToken={accessToken}
+          objectTypes={objectTypes}
+          onUpdateEntry={handleSaveGlazeInventoryEntry}
+          onDeleteEntry={handleDeleteGlazeInventoryEntry}
+          onMixNew={(recipe) => {
+            setMixingRecipe(recipe)
+          }}
         />
       )
     }
