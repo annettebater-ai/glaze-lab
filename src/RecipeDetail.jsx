@@ -32,9 +32,8 @@ const StarDisplay = ({ value }) => (
 
 function IngredientStockBadge({ name, materials }) {
   const mat = (materials || []).find(m => m.name.toLowerCase() === name?.toLowerCase())
-  if (!mat) return null
+  if (!mat) return <span className="ing-stock-badge unknown">Not in library</span>
   const status = getStockStatus(mat)
-  if (!status || status === 'ok') return null
   if (status === 'out') return <span className="ing-stock-badge out">Out</span>
   if (status === 'low') return <span className="ing-stock-badge low">Low</span>
   return null
@@ -146,7 +145,6 @@ function InlineNameEditor({ name, onSave }) {
 }
 
 export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onSaveRecipe, onEditRecipe, testResults, mixingSessions, onSaveTestResult, onDeleteTestResult, accessToken, photosFolderId, materials, clayBodies }) {
-  const [showStull, setShowStull] = useState(false)
   const [showTestForm, setShowTestForm] = useState(false)
   const [editingResult, setEditingResult] = useState(null)
   const [selectedResult, setSelectedResult] = useState(null)
@@ -510,19 +508,11 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onS
               ))}
             </div>
           </div>
-          <button
-            className="stull-toggle-btn"
-            onClick={() => setShowStull(!showStull)}
-          >
-            {showStull ? 'Hide Stull Chart' : 'Show Stull Chart'}
-          </button>
-          {showStull && (
-            <StullChart
-              al2o3={stull.x}
-              sio2={stull.y}
-              zone={stull.zone}
-            />
-          )}
+          <StullChart
+            al2o3={stull.x}
+            sio2={stull.y}
+            zone={stull.zone}
+          />
         </div>
       )}
 

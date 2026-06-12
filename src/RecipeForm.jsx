@@ -144,7 +144,6 @@ function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
       : [{ material: '', percent: '' }]
   )
   const [chemistry, setChemistry] = useState(null)
-  const [showStull, setShowStull] = useState(false)
   const [notes, setNotes] = useState(recipe?.notes || '')
 
   const [addMaterialModal, setAddMaterialModal] = useState(false)
@@ -166,7 +165,6 @@ function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
       setChemistry(result)
     } else {
       setChemistry(null)
-      setShowStull(false)
     }
   }, [baseIngredients])
 
@@ -470,21 +468,11 @@ function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
                 </div>
               </div>
 
-              <button
-                type="button"
-                className="stull-btn"
-                onClick={() => setShowStull(!showStull)}
-              >
-                {showStull ? 'Hide Stull Chart' : 'Show Stull Chart'}
-              </button>
-
-              {showStull && (
-                <StullChart
-                  al2o3={chemistry.stull.x}
-                  sio2={chemistry.stull.y}
-                  zone={chemistry.stull.zone}
-                />
-              )}
+              <StullChart
+                al2o3={chemistry.stull.x}
+                sio2={chemistry.stull.y}
+                zone={chemistry.stull.zone}
+              />
             </div>
           )}
 

@@ -28,6 +28,7 @@ import {
 import { testResultToMarkdown, markdownToTestResult } from './testResults'
 import { materialToMarkdown, markdownToMaterial, toGrams, fromGrams } from './materials'
 import { clayBodyToMarkdown, markdownToClayBody } from './clayBodies'
+import { DEFAULT_OBJECT_TYPES } from './objectTypes'
 import './App.css'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
@@ -85,6 +86,7 @@ function App() {
   const [mixingSessions, setMixingSessions] = useState([])
   const [materials, setMaterials] = useState([])
   const [clayBodies, setClayBodies] = useState([])
+  const [objectTypes, setObjectTypes] = useState(DEFAULT_OBJECT_TYPES)
   const [vaultFolders, setVaultFolders] = useState(null)
   const [statusMessage, setStatusMessage] = useState('')
   const [selectedRecipe, setSelectedRecipe] = useState(null)
@@ -388,6 +390,18 @@ function App() {
     setClayBodies(prev => prev.filter(c => c.id !== clayBody.id))
   }
 
+  const handleSaveObjectType = (objectType) => {
+    setObjectTypes(prev => {
+      const exists = prev.find(o => o.id === objectType.id)
+      if (exists) return prev.map(o => o.id === objectType.id ? objectType : o)
+      return [...prev, objectType]
+    })
+  }
+
+  const handleDeleteObjectType = (objectType) => {
+    setObjectTypes(prev => prev.filter(o => o.id !== objectType.id))
+  }
+
   const handleSessionComplete = async (sessionData) => {
     const recipe = sessionData.recipe
     const batchGrams = sessionData.batchGrams
@@ -482,6 +496,7 @@ function App() {
     setMixingSessions([])
     setMaterials([])
     setClayBodies([])
+    setObjectTypes(DEFAULT_OBJECT_TYPES)
     setSelectedRecipe(null)
     setMixingRecipe(null)
     setEditingRecipe(null)
@@ -528,6 +543,7 @@ function App() {
         <MixingSession
           recipe={mixingRecipe}
           materials={materials}
+          objectTypes={objectTypes}
           onComplete={handleSessionComplete}
           onCancel={() => setMixingRecipe(null)}
         />
@@ -646,6 +662,9 @@ function App() {
           clayBodies={clayBodies}
           onSaveClayBody={handleSaveClayBody}
           onDeleteClayBody={handleDeleteClayBody}
+          objectTypes={objectTypes}
+          onSaveObjectType={handleSaveObjectType}
+          onDeleteObjectType={handleDeleteObjectType}
         />
       )
     }

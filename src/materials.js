@@ -7,8 +7,7 @@ amount: ${material.amount}
 unit: ${material.unit}
 starting-amount: ${material.startingAmount}
 is-approximate: ${material.isApproximate ? 'true' : 'false'}
-price: ${material.price || ''}
-price-unit: ${material.priceUnit || 'kg'}
+total-cost: ${material.totalCost || ''}
 price-approximate: ${material.priceApproximate ? 'true' : 'false'}
 notes: ${material.notes || ''}
 created: ${material.created}
@@ -40,8 +39,7 @@ export function markdownToMaterial(content, fileId) {
       unit: get('unit') || 'g',
       startingAmount: parseFloat(get('starting-amount')) || 0,
       isApproximate: get('is-approximate') === 'true',
-      price: get('price') ? parseFloat(get('price')) : null,
-      priceUnit: get('price-unit') || 'kg',
+      totalCost: get('total-cost') ? parseFloat(get('total-cost')) : null,
       priceApproximate: get('price-approximate') === 'true',
       notes: get('notes'),
       created: get('created'),
@@ -53,10 +51,12 @@ export function markdownToMaterial(content, fileId) {
 }
 
 export function getStockStatus(material) {
-  if (!material || material.startingAmount === 0) return null
-  const pct = material.amount / material.startingAmount
+  if (!material) return 'unknown'
   if (material.amount <= 0) return 'out'
-  if (pct <= 0.25) return 'low'
+  if (material.startingAmount > 0) {
+    const pct = material.amount / material.startingAmount
+    if (pct <= 0.25) return 'low'
+  }
   return 'ok'
 }
 
@@ -83,16 +83,11 @@ export function fromGrams(grams, unit) {
   }
 }
 
-// Returns price per gram in CAD
 export function getPricePerGram(material) {
-  if (!material.price) return null
-  switch (material.priceUnit) {
-    case 'kg': return material.price / 1000
-    case 'lb': return material.price / 453.592
-    case 'oz': return material.price / 28.3495
-    case 'g': return material.price
-    default: return material.price / 1000
-  }
+  if (!material.totalCost || !material.startingAmount) return null
+  const startingGrams = toGrams(material.startingAmount, material.unit)
+  if (startingGrams === 0) return null
+  return material.totalCost / startingGrams
 }
 
 export function calcIngredientCost(material, usedGrams) {

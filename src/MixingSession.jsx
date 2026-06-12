@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import { Modal, Text, BlockStack } from '@shopify/polaris'
 import SubstitutionAssistant from './SubstitutionAssistant'
 import { getStockStatus, toGrams, calcIngredientCost } from './materials'
+import { calcSurfaceArea, calcGlazeVolume, groupByCategory, DEFAULT_OBJECT_TYPES } from './objectTypes'
 import './MixingSession.css'
 
 const UNITS = ['g', 'kg', 'lb', 'oz']
@@ -12,18 +14,20 @@ const TO_GRAMS = {
   oz: 28.3495
 }
 
-export default function MixingSession({ recipe, materials, onComplete, onCancel }) {
+export default function MixingSession({ recipe, materials, objectTypes, onComplete, onCancel }) {
   const [batchSize, setBatchSize] = useState('')
   const [unit, setUnit] = useState('g')
   const [checked, setChecked] = useState({})
   const [sgMeasured, setSgMeasured] = useState('')
   const [sessionNotes, setSessionNotes] = useState('')
   const [showSG, setShowSG] = useState(false)
-  const [showCost, setShowCost] = useState(false)
+  const [showDipModal, setShowDipModal] = useState(false)
 
   if (!recipe) return null
 
+  const allTypes = objectTypes || DEFAULT_OBJECT_TYPES
   const batchGrams = parseFloat(batchSize) * TO_GRAMS[unit] || 0
+  const batchReady = batchGrams > 0
 
   const calcGrams = (percent) => {
     if (!batchGrams) return '—'
@@ -36,11 +40,14 @@ export default function MixingSession({ recipe, materials, onComplete, onCancel 
 
   const getIngredientStatus = (name, percent) => {
     const mat = getMaterial(name)
-    if (!mat) return null
-    if (!batchGrams) return getStockStatus(mat)
+    if (!mat) return 'unknown'
+    if (mat.amount <= 0) return 'out'
+    if (!batchGrams) {
+      if (mat.startingAmount > 0 && mat.amount / mat.startingAmount <= 0.25) return 'low'
+      return 'ok'
+    }
     const neededGrams = batchGrams * percent / 100
     const availableGrams = toGrams(mat.amount, mat.unit)
-    if (availableGrams <= 0) return 'out'
     if (availableGrams < neededGrams) return 'out'
     if (mat.startingAmount > 0 && mat.amount / mat.startingAmount <= 0.25) return 'low'
     return 'ok'
@@ -56,6 +63,7 @@ export default function MixingSession({ recipe, materials, onComplete, onCancel 
   const allDone = checkedCount === totalCount && totalCount > 0
 
   const toggleChecked = (key) => {
+    if (!batchReady) return
     setChecked(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
@@ -73,29 +81,43 @@ export default function MixingSession({ recipe, materials, onComplete, onCancel 
     if (!mat || !batchGrams) return { name: ing.material, cost: null, estimated: false }
     const usedGrams = batchGrams * ing.percent / 100
     const cost = calcIngredientCost(mat, usedGrams)
-    return {
-      name: ing.material,
-      usedGrams,
-      cost,
-      estimated: mat.priceApproximate,
-      hasPrice: mat.price !== null && mat.price !== undefined
-    }
+    return { name: ing.material, usedGrams, cost, estimated: mat.priceApproximate }
   })
 
   const totalCost = costBreakdown.reduce((sum, item) => sum + (item.cost || 0), 0)
   const hasAnyCost = costBreakdown.some(item => item.cost !== null)
   const hasEstimated = costBreakdown.some(item => item.estimated && item.cost !== null)
 
+  const glazeDensity = sgValue && !isNaN(sgValue) ? sgValue : 1.45
+  const costPerGram = batchGrams > 0 && totalCost > 0 ? totalCost / batchGrams : null
+  const costPerMl = costPerGram ? costPerGram * glazeDensity : null
+
+  const getDipCost = (obj) => {
+    if (!costPerMl) return null
+    const area = calcSurfaceArea(obj)
+    const volume = calcGlazeVolume(area)
+    return volume * costPerMl
+  }
+
+  const defaultObj = allTypes.find(o => o.category === 'Mug' && o.variant === 'MD') || allTypes[0]
+  const defaultDipCost = defaultObj ? getDipCost(defaultObj) : null
+  const groupedObjectTypes = groupByCategory(allTypes)
+
   const handleComplete = () => {
     onComplete({
       recipe,
       recipeId: recipe.id,
+      recipeSlug: recipe.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      recipeName: recipe.name,
       batchSize: parseFloat(batchSize),
       unit,
       batchGrams,
+      batchCost: hasAnyCost ? totalCost : null,
+      batchCostEstimated: hasEstimated,
       sgMeasured: sgValue || null,
       notes: sessionNotes,
       date: new Date().toISOString().split('T')[0],
+      id: Date.now().toString(),
       completed: true
     })
   }
@@ -105,28 +127,33 @@ export default function MixingSession({ recipe, materials, onComplete, onCancel 
     const status = getIngredientStatus(ing.material, ing.percent)
     const isOut = status === 'out'
     const isLow = status === 'low'
+    const isUnknown = status === 'unknown'
+    const locked = !batchReady
 
     return (
       <button
         key={key}
-        className={`mix-ingredient ${done ? 'checked' : ''} ${isOut ? 'stock-out' : ''}`}
+        className={`mix-ingredient ${done ? 'checked' : ''} ${isOut ? 'stock-out' : ''} ${locked ? 'locked' : ''}`}
         onClick={() => toggleChecked(key)}
+        disabled={locked}
+        title={locked ? 'Enter a batch size first' : ''}
       >
         <div className="mix-ing-left">
-          <div className={`mix-check ${done ? 'done' : ''}`}>
-            {done ? '✓' : ''}
+          <div className={`mix-check ${done ? 'done' : ''} ${locked ? 'locked' : ''}`}>
+            {locked ? '🔒' : done ? '✓' : ''}
           </div>
           <div className="mix-ing-info">
-            <div className={`mix-ing-name ${done ? 'struck' : ''}`}>
-              {ing.material}
+            <div className={`mix-ing-name ${done ? 'struck' : ''} ${locked ? 'muted' : ''}`}>
+              <span>{ing.material}</span>
               {isOut && !done && <span className="stock-badge out">Out</span>}
               {isLow && !isOut && !done && <span className="stock-badge low">Low</span>}
+              {isUnknown && !done && <span className="stock-badge unknown">?</span>}
             </div>
             <div className="mix-ing-pct">{ing.percent}% of base</div>
           </div>
         </div>
-        <div className={`mix-ing-weight ${done ? 'struck' : ''} ${isOut ? 'text-danger' : ''}`}>
-          {calcGrams(ing.percent)}
+        <div className={`mix-ing-weight ${done ? 'struck' : ''} ${isOut ? 'text-danger' : ''} ${locked ? 'muted' : ''}`}>
+          {locked ? '—' : calcGrams(ing.percent)}
         </div>
       </button>
     )
@@ -148,8 +175,11 @@ export default function MixingSession({ recipe, materials, onComplete, onCancel 
         />
       </div>
 
-      <div className="mix-batch-bar">
-        <div className="mix-batch-label">Batch size</div>
+      <div className={`mix-batch-bar ${!batchReady ? 'batch-required' : ''}`}>
+        <div className="mix-batch-label">
+          Batch size
+          {!batchReady && <span className="batch-required-hint"> — enter to unlock ingredients</span>}
+        </div>
         <div className="mix-batch-controls">
           <input
             className="mix-batch-input"
@@ -189,49 +219,35 @@ export default function MixingSession({ recipe, materials, onComplete, onCancel 
         </>
       )}
 
-      {hasAnyCost && batchGrams > 0 && (
-        <div className="mix-sg-section">
-          <div className="mix-sg-header">
-            <button
-              className="sg-toggle-inline"
-              onClick={() => setShowCost(!showCost)}
-            >
-              {showCost ? 'Hide Cost Estimate' : `Cost Estimate — $${totalCost.toFixed(2)}${hasEstimated ? ' (est.)' : ''}`}
-            </button>
+      {batchReady && (
+        <div className="batch-cost-summary">
+          <div className="batch-cost-row">
+            <span className="batch-cost-label">Batch cost</span>
+            <span className="batch-cost-value">
+              {hasAnyCost ? `$${totalCost.toFixed(2)}${hasEstimated ? ' (est.)' : ''}` : '—'}
+            </span>
           </div>
-          {showCost && (
-            <div className="cost-panel">
-              {costBreakdown.map((item, i) => (
-                item.cost !== null ? (
-                  <div key={i} className="cost-row">
-                    <span className="cost-name">
-                      {item.name}
-                      {item.estimated && <span className="cost-est-badge">estimated</span>}
-                    </span>
-                    <span className="cost-amount">${item.cost.toFixed(3)}</span>
-                  </div>
-                ) : (
-                  <div key={i} className="cost-row cost-row-unknown">
-                    <span className="cost-name">{item.name}</span>
-                    <span className="cost-unknown">no price set</span>
-                  </div>
-                )
-              ))}
-              <div className="cost-total-row">
-                <span>Total batch cost</span>
-                <span>${totalCost.toFixed(2)}{hasEstimated ? ' (est.)' : ''}</span>
-              </div>
+          {defaultObj && (
+            <div className="batch-cost-row">
+              <span className="batch-cost-label">{defaultObj.category} {defaultObj.variant} per dip</span>
+              <span className="batch-cost-value">
+                {defaultDipCost !== null ? `$${defaultDipCost.toFixed(3)}${hasEstimated ? ' (est.)' : ''}` : '—'}
+                {' '}
+                <button type="button" className="see-more-link" onClick={() => setShowDipModal(true)}>
+                  See more...
+                </button>
+              </span>
             </div>
+          )}
+          {!hasAnyCost && (
+            <div className="batch-cost-hint">Add prices to materials to see cost estimates.</div>
           )}
         </div>
       )}
 
       <div className="mix-sg-section">
         <div className="mix-sg-header">
-          <button
-            className="sg-toggle-inline"
-            onClick={() => setShowSG(!showSG)}
-          >
+          <button className="sg-toggle-inline" onClick={() => setShowSG(!showSG)}>
             {showSG ? 'Hide SG Calculator' : 'SG Calculator'}
           </button>
         </div>
@@ -275,7 +291,7 @@ export default function MixingSession({ recipe, materials, onComplete, onCancel 
           onClick={handleComplete}
           disabled={!allDone}
         >
-          {allDone ? 'Complete Session' : `${totalCount - checkedCount} remaining`}
+          {!batchReady ? 'Enter batch size first' : allDone ? 'Complete Session' : `${totalCount - checkedCount} remaining`}
         </button>
       </div>
 
@@ -283,6 +299,61 @@ export default function MixingSession({ recipe, materials, onComplete, onCancel 
         recipe={recipe}
         checkedIngredients={checked}
       />
+
+      <Modal
+        open={showDipModal}
+        onClose={() => setShowDipModal(false)}
+        title="Per-Dip Cost by Object Type"
+      >
+        <Modal.Section>
+          <BlockStack gap="200">
+            <Text tone="subdued" variant="bodySm">
+              Based on SG {glazeDensity.toFixed(2)} · 0.5mm glaze layer
+              {hasEstimated ? ' · some prices estimated' : ''}
+            </Text>
+            {Object.entries(groupedObjectTypes).map(([category, items]) => (
+              <div key={category}>
+                <div style={{padding: '8px 0 4px', fontSize: '11px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid #f0f0f0', marginBottom: '4px'}}>
+                  {category}
+                </div>
+                {items.map(obj => {
+                  const dipCost = getDipCost(obj)
+                  const area = calcSurfaceArea(obj)
+                  const volume = calcGlazeVolume(area)
+                  const isDefault = obj.id === defaultObj?.id
+                  return (
+                    <div
+                      key={obj.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: isDefault ? '7px 8px' : '7px 0',
+                        borderBottom: '1px solid #f9f9f9',
+                        background: isDefault ? '#f5f0e8' : 'transparent',
+                        borderRadius: isDefault ? '4px' : '0',
+                      }}
+                    >
+                      <div>
+                        <span style={{fontSize: '14px', fontWeight: isDefault ? 700 : 400}}>
+                          {obj.variant}
+                          {isDefault && <span style={{fontSize: '11px', color: '#888', marginLeft: '6px'}}>default</span>}
+                        </span>
+                        <div style={{fontSize: '11px', color: '#aaa'}}>
+                          {obj.height}" H · {obj.maxDiameter}" ⌀ · {volume.toFixed(1)} mL/dip
+                        </div>
+                      </div>
+                      <span style={{fontSize: '14px', fontWeight: 600, color: dipCost ? '#1a3a5c' : '#aaa'}}>
+                        {dipCost ? `$${dipCost.toFixed(3)}` : 'no price'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
 
     </div>
   )

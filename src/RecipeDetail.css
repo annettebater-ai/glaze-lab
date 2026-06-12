@@ -162,6 +162,10 @@
   padding: 10px 0;
   font-size: 15px;
   color: #1a1a1a;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .ing-td-right {
