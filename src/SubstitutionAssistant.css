@@ -1,0 +1,375 @@
+/* ── Trigger button ── */
+.sa-trigger {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  background: #1a1a1a;
+  color: white;
+  border: none;
+  border-radius: 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  z-index: 200;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.sa-trigger:active {
+  transform: scale(0.97);
+}
+
+.sa-trigger-icon {
+  font-size: 16px;
+  color: #c8a96e;
+}
+
+.sa-trigger-label {
+  color: white;
+}
+
+/* ── Mobile overlay ── */
+.sa-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 300;
+  display: flex;
+  align-items: flex-end;
+}
+
+/* ── Mobile panel (slide up) ── */
+.sa-panel-mobile {
+  width: 100%;
+  max-height: 85vh;
+  background: white;
+  border-radius: 20px 20px 0 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideUp 0.25s ease;
+  color: #1a1a1a;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+/* ── Desktop panel (docked right) ── */
+.sa-panel-desktop {
+  position: fixed;
+  top: 56px;
+  right: 0;
+  bottom: 0;
+  width: 360px;
+  background: white;
+  border-left: 1px solid #e3e3e3;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 150;
+  box-shadow: -4px 0 16px rgba(0,0,0,0.08);
+  animation: slideInRight 0.2s ease;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+/* ── Panel header ── */
+.sa-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  background: #1a1a1a;
+  color: white;
+  flex-shrink: 0;
+}
+
+.sa-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: white;
+}
+
+.sa-header-icon {
+  color: #c8a96e;
+  font-size: 16px;
+}
+
+.sa-close {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.6);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+
+/* ── Context bar ── */
+.sa-panel-context {
+  padding: 8px 16px;
+  background: #f5f5f5;
+  font-size: 12px;
+  color: #888;
+  border-bottom: 1px solid #e8e8e8;
+  flex-shrink: 0;
+}
+
+/* ── Messages ── */
+.sa-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: white;
+}
+
+.sa-msg {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.sa-msg-user {
+  flex-direction: row-reverse;
+}
+
+.sa-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #1a1a1a;
+  color: #c8a96e;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sa-bubble {
+  padding: 9px 13px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 85%;
+}
+
+.sa-bubble-user {
+  background: #1a3a5c;
+  color: white;
+  border-radius: 14px 14px 4px 14px;
+}
+
+.sa-bubble-assistant {
+  background: #f0f0f0;
+  color: #1a1a1a;
+  border-radius: 14px 14px 14px 4px;
+}
+
+.sa-bubble-assistant p {
+  color: #1a1a1a;
+  margin: 0 0 6px;
+}
+
+.sa-bubble-assistant p:last-child {
+  margin-bottom: 0;
+}
+
+.sa-bubble-error {
+  background: #fff0f0;
+  color: #cc2200;
+  border-radius: 14px 14px 14px 4px;
+}
+
+.sa-tips {
+  margin-top: 8px;
+  padding-left: 16px;
+  font-size: 13px;
+  color: #444;
+}
+
+.sa-tips li {
+  margin-bottom: 4px;
+  color: #444;
+}
+
+/* ── Substitution card ── */
+.sa-sub-card {
+  background: #f8f8f8;
+  border-radius: 12px;
+  padding: 12px;
+  max-width: 95%;
+  border: 1px solid #e8e8e8;
+  color: #1a1a1a;
+}
+
+.sa-sub-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a3a5c;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 10px;
+}
+
+.sa-sub-option {
+  background: white;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border: 1px solid #e8e8e8;
+}
+
+.sa-sub-option.recommended {
+  border-color: #1a7a1a;
+  background: #f8fdf8;
+}
+
+.sa-sub-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.sa-sub-material {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.sa-sub-badge {
+  font-size: 10px;
+  font-weight: 700;
+  background: #1a7a1a;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.sa-sub-adjustment {
+  font-size: 13px;
+  color: #2d6a9f;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.sa-sub-notes {
+  font-size: 12px;
+  color: #666;
+}
+
+.sa-sub-impact {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e8e8e8;
+  font-size: 12px;
+  color: #444;
+}
+
+.sa-impact-label {
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+/* ── Loading dots ── */
+.sa-loading {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 10px 13px;
+}
+
+.sa-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #aaa;
+  animation: dotPulse 1.2s infinite;
+}
+
+.sa-dot:nth-child(2) { animation-delay: 0.2s; }
+.sa-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes dotPulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
+
+/* ── Input row ── */
+.sa-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 12px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid #e8e8e8;
+  background: white;
+  flex-shrink: 0;
+}
+
+.sa-input {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid #c9cccf;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #1a1a1a;
+  background: white;
+  resize: none;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+.sa-input:focus {
+  outline: none;
+  border-color: #1a3a5c;
+}
+
+.sa-input::placeholder {
+  color: #aaa;
+}
+
+.sa-send {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #c9cccf;
+  border: none;
+  color: white;
+  font-size: 16px;
+  cursor: not-allowed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.sa-send.active {
+  background: #1a3a5c;
+  cursor: pointer;
+}
+
+/* ── Desktop content shift ── */
+.sidekick-open .app-main {
+  margin-right: 360px;
+  transition: margin-right 0.2s ease;
+}

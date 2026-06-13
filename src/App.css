@@ -1,131 +1,303 @@
-* {
-  margin: 0;
-  padding: 0;
+:root {
+  --p-color-bg: #f5f0e8;
+  --p-color-bg-app: #f5f0e8;
+  --p-color-bg-surface: #ffffff;
+  --p-color-bg-surface-secondary: #ede8e0;
+  --p-color-bg-inverse: #1a1a1a;
+  --p-color-bg-fill-brand: #1a3a5c;
+  --p-color-bg-fill-brand-hover: #15304d;
+  --p-color-bg-fill-brand-active: #112640;
+  --p-color-bg-fill-brand-selected: #1a3a5c;
+  --p-color-text-brand-on-bg-fill: #ffffff;
+  --p-color-border-brand: #1a3a5c;
+}
+html {
+  background: #f5f0e8 !important;
+}
+
+html body {
+  background: #f5f0e8 !important;
+}
+
+html body #root {
+  background: #f5f0e8 !important;
+}
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background-color: #f5f5f5;
-  color: #1a1a1a;
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background: #f5f0e8;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-.app {
+/* ── App shell ── */
+.app-shell {
+  min-height: 100vh;
+  background: #f5f0e8;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  flex: 1;
+  padding-top: 56px;
+  background: #f5f0e8;
   min-height: 100vh;
 }
 
-/* ── Login ── */
+/* Force Polaris page background */
+.Polaris-Page,
+.Polaris-Frame,
+.Polaris-Frame__Main,
+.Polaris-Frame__Content {
+  background: #f5f0e8 !important;
+}
+
+/* ── Topbar ── */
+.app-topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: #1a1a1a;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  z-index: 100;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+.topbar-burger {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.topbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.topbar-logo-text {
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.topbar-search {
+  flex: 1;
+  max-width: 400px;
+}
+
+.topbar-search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: text;
+}
+
+.topbar-search-field input {
+  background: none;
+  border: none;
+  outline: none;
+  color: rgba(255,255,255,0.8);
+  font-size: 13px;
+  width: 100%;
+}
+
+.topbar-search-field input::placeholder {
+  color: rgba(255,255,255,0.4);
+}
+
+.topbar-right {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  position: relative;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.topbar-user:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+.topbar-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #c8a96e;
+  color: #1a1a1a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.topbar-username {
+  color: rgba(255,255,255,0.85);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ── User menu dropdown ── */
+.user-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: white;
+  border: 1px solid #e3e3e3;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  min-width: 180px;
+  z-index: 200;
+  overflow: hidden;
+}
+
+.user-menu-name {
+  padding: 12px 16px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.user-menu-email {
+  padding: 0 16px 10px;
+  font-size: 12px;
+  color: #888;
+}
+
+.user-menu-divider {
+  height: 1px;
+  background: #f0f0f0;
+}
+
+.user-menu-item {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: #cc2200;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.user-menu-item:hover {
+  background: #fff5f5;
+}
+
+/* ── Nav drawer ── */
+.nav-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 150;
+}
+
+.nav-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 240px;
+  background: #1a1a1a;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  padding-top: 70px;
+}
+
+.nav-items {
+  flex: 1;
+  padding: 8px 0;
+}
+
+.nav-item {
+  display: block;
+  width: 100%;
+  padding: 12px 20px;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.75);
+  font-size: 15px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.nav-item:hover {
+  background: rgba(255,255,255,0.08);
+  color: white;
+}
+
+.nav-item.active {
+  background: rgba(255,255,255,0.12);
+  color: white;
+  font-weight: 600;
+}
+
+.nav-settings {
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding: 8px 0;
+}
+
+/* ── Loading / Login screens ── */
+.loading-screen,
 .login-screen {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
-  background: #f5f5f5;
+  background: #f5f0e8;
 }
 
+.loading-card,
 .login-card {
   background: white;
   border-radius: 16px;
-  padding: 48px 32px;
-  text-align: center;
+  padding: 48px 40px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-  max-width: 360px;
-  width: 100%;
-}
-
-.login-card h1 {
-  font-size: 32px;
-  font-weight: 700;
-  color: #1a3a5c;
-  margin-bottom: 8px;
-}
-
-.login-card p {
-  font-size: 16px;
-  color: #666;
-  margin-bottom: 32px;
-}
-
-.google-btn {
-  background: #1a3a5c;
-  color: white;
-  border: none;
-  border-radius: 12px;
-  padding: 16px 32px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  width: 100%;
-}
-
-/* ── Desktop layout ── */
-.app.desktop {
-  display: flex;
-}
-
-.main-content.with-sidebar {
-  margin-left: 220px;
-  flex: 1;
-  min-height: 100vh;
-}
-
-/* ── Mobile layout ── */
-.main-content.with-bottom-nav {
-  padding-bottom: 64px;
-  min-height: 100vh;
-}
-
-.mobile-header {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
-  padding: 14px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.mobile-header h1 {
-  font-size: 18px;
-  font-weight: 700;
-  color: #1a3a5c;
-}
-
-.status-msg {
-  font-size: 12px;
-  color: #2d6a9f;
-  font-style: italic;
-}
-
-.desktop-status {
-  padding: 8px 20px;
-  background: #e8f4ff;
-  font-size: 13px;
-  color: #2d6a9f;
   text-align: center;
+  min-width: 280px;
 }
-
-.screen-content {
-  min-height: calc(100vh - 53px);
-}
-
-/* ── Placeholder screens ── */
-.placeholder-screen {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 300px;
-  color: #999;
-  font-size: 16px;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 60px 20px;
-  color: #999;
-  font-size: 15px;
-  line-height: 2;
+/* Force full width cream background */
+.Polaris-Page__Content,
+.Polaris-Page,
+[class*="Polaris-Page"] {
+  background: #f5f0e8 !important;
 }

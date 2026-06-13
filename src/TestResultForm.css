@@ -1,0 +1,155 @@
+.test-result-form {
+  padding: 4px 0 40px;
+}
+
+/* Star rating */
+.star-rating {
+  display: flex;
+  gap: 4px;
+}
+
+.star {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #ddd;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s;
+  line-height: 1;
+}
+
+.star.active {
+  color: #f0a500;
+}
+
+.star:hover {
+  color: #f0a500;
+}
+
+/* Layer rows */
+.layer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.layer-order-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.layer-order-btn {
+  background: none;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 1px 4px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.layer-order-btn:hover {
+  background: #f5f5f5;
+}
+
+.layer-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #1a3a5c;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.layer-type-select {
+  padding: 7px 10px;
+  border: 1px solid #c9cccf;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #1a1a1a;
+  background: white;
+  -webkit-appearance: none;
+  width: 120px;
+  flex-shrink: 0;
+}
+
+.layer-recipe-input {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid #c9cccf;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #1a1a1a;
+  background: white;
+}
+
+.layer-recipe-input:focus {
+  outline: none;
+  border-color: #1a3a5c;
+}
+
+.layer-remove {
+  background: none;
+  border: none;
+  color: #cc2200;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+/* Photos */
+.photo-preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.photo-preview-thumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #f5f5f5;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #555;
+}
+
+.photo-preview-thumb button {
+  background: none;
+  border: none;
+  color: #cc2200;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+}
+
+.photo-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #f5f5f5;
+  border: 2px dashed #c9cccf;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a3a5c;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.photo-upload-btn:hover {
+  background: #e8f0fe;
+}

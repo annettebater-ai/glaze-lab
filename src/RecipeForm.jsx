@@ -1,8 +1,11 @@
-import { useState, useEffect, useRef } from 'react'
-import { analyseRecipe, MATERIALS } from './chemistry'
+import { useState, useEffect, useCallback } from 'react'
+import { analyseRecipe, MATERIALS as CHEMISTRY_MATERIALS } from './chemistry'
+import {
+  Modal, BlockStack, Text, TextField, Select, InlineStack,
+  Combobox, Listbox,
+} from '@shopify/polaris'
+import StullChart from './StullChart'
 import './RecipeForm.css'
-
-const MATERIAL_NAMES = Object.keys(MATERIALS).sort()
 
 const RECIPE_TYPES = [
   'Glaze', 'Underglaze', 'Engobe', 'Flashing Slip',
@@ -25,163 +28,129 @@ const GLAZE_TYPE_COLORS = {
   unknown: '#888888'
 }
 
-function StullChart({ x, y, zone }) {
-  const canvasRef = useRef(null)
+const UNITS = [
+  { label: 'grams (g)', value: 'g' },
+  { label: 'kilograms (kg)', value: 'kg' },
+  { label: 'pounds (lb)', value: 'lb' },
+  { label: 'ounces (oz)', value: 'oz' },
+]
 
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    const w = canvas.width
-    const h = canvas.height
-    const pad = { top: 30, right: 20, bottom: 40, left: 40 }
-    const chartW = w - pad.left - pad.right
-    const chartH = h - pad.top - pad.bottom
+function IngredientCombobox({ value, onChange, onBlur, materials, placeholder }) {
+  const [inputValue, setInputValue] = useState(value || '')
+  const [options, setOptions] = useState([])
 
-    // Scale: x = Al2O3 0–0.75, y = SiO2 0–5.5
-    const toCanvasX = (al) => pad.left + (al / 0.75) * chartW
-    const toCanvasY = (si) => pad.top + chartH - (si / 5.5) * chartH
+  useEffect(() => { setInputValue(value || '') }, [value])
 
-    ctx.clearRect(0, 0, w, h)
-    ctx.fillStyle = '#fafaf8'
-    ctx.fillRect(0, 0, w, h)
+  const libraryNames = (materials || []).map(m => m.name)
+  const chemNames = Object.keys(CHEMISTRY_MATERIALS)
+  const allNames = [...new Set([...libraryNames, ...chemNames])].sort()
 
-    // Draw zones
-    const zones = [
-      { pts: [[0,0],[0.2,0],[0.2,1.5],[0.1,1.0],[0,0.8]], color: '#e8d5c0', label: 'Underfired' },
-      { pts: [[0.2,0],[0.5,0],[0.5,2.5],[0.35,2.5],[0.2,1.5]], color: '#d4e8d0', label: 'Matte' },
-      { pts: [[0.15,1.5],[0.35,1.5],[0.35,3.5],[0.15,3.5]], color: '#c8d8f0', label: 'Microcrystalline' },
-      { pts: [[0.3,2.5],[0.7,2.5],[0.7,5.5],[0.3,5.5]], color: '#f0e8c8', label: 'Glossy' },
-    ]
+  const inLibrary = (name) =>
+    libraryNames.some(n => n.toLowerCase() === name.toLowerCase())
 
-    zones.forEach(({ pts, color, label }) => {
-      ctx.beginPath()
-      pts.forEach(([ax, sy], i) => {
-        const cx = toCanvasX(ax)
-        const cy = toCanvasY(sy)
-        i === 0 ? ctx.moveTo(cx, cy) : ctx.lineTo(cx, cy)
-      })
-      ctx.closePath()
-      ctx.fillStyle = color
-      ctx.globalAlpha = 0.6
-      ctx.fill()
-      ctx.globalAlpha = 1
-      ctx.strokeStyle = '#aaa'
-      ctx.lineWidth = 0.5
-      ctx.stroke()
-    })
+  const updateOptions = useCallback((query) => {
+    const q = query.toLowerCase()
+    const filtered = q
+      ? allNames.filter(n => n.toLowerCase().includes(q))
+      : allNames.slice(0, 10)
+    setOptions(filtered)
+  }, [allNames.join(',')])
 
-    // Zone labels
-    const zoneLabels = [
-      { text: 'Underfired', ax: 0.08, sy: 0.35 },
-      { text: 'Matte', ax: 0.32, sy: 0.7 },
-      { text: 'Microcrystalline', ax: 0.22, sy: 2.6 },
-      { text: 'Glossy', ax: 0.48, sy: 3.8 },
-    ]
-    ctx.font = '9px -apple-system, sans-serif'
-    ctx.fillStyle = '#666'
-    ctx.textAlign = 'center'
-    zoneLabels.forEach(({ text, ax, sy }) => {
-      ctx.fillText(text, toCanvasX(ax), toCanvasY(sy))
-    })
+  const handleInputChange = (val) => {
+    setInputValue(val)
+    onChange(val)
+    updateOptions(val)
+  }
 
-    // Grid lines
-    ctx.strokeStyle = '#ddd'
-    ctx.lineWidth = 0.5
-    ctx.setLineDash([2, 3])
-    for (let ax = 0; ax <= 0.75; ax += 0.1) {
-      ctx.beginPath()
-      ctx.moveTo(toCanvasX(ax), pad.top)
-      ctx.lineTo(toCanvasX(ax), pad.top + chartH)
-      ctx.stroke()
-    }
-    for (let sy = 0; sy <= 5.5; sy += 0.5) {
-      ctx.beginPath()
-      ctx.moveTo(pad.left, toCanvasY(sy))
-      ctx.lineTo(pad.left + chartW, toCanvasY(sy))
-      ctx.stroke()
-    }
-    ctx.setLineDash([])
+  const handleSelect = (selected) => {
+    setInputValue(selected)
+    onChange(selected)
+    setOptions([])
+    if (onBlur) onBlur(selected)
+  }
 
-    // Axes
-    ctx.strokeStyle = '#888'
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.moveTo(pad.left, pad.top)
-    ctx.lineTo(pad.left, pad.top + chartH)
-    ctx.lineTo(pad.left + chartW, pad.top + chartH)
-    ctx.stroke()
+  const handleFocus = () => {
+    updateOptions(inputValue)
+  }
 
-    // Axis labels
-    ctx.font = '10px -apple-system, sans-serif'
-    ctx.fillStyle = '#555'
-    ctx.textAlign = 'center'
-    ctx.fillText('Al₂O₃', pad.left + chartW / 2, h - 4)
-    ctx.save()
-    ctx.translate(12, pad.top + chartH / 2)
-    ctx.rotate(-Math.PI / 2)
-    ctx.fillText('SiO₂', 0, 0)
-    ctx.restore()
-
-    // Axis tick values
-    ctx.font = '8px -apple-system, sans-serif'
-    ctx.fillStyle = '#888'
-    ctx.textAlign = 'center'
-    for (let ax = 0; ax <= 0.7; ax += 0.2) {
-      ctx.fillText(ax.toFixed(1), toCanvasX(ax), pad.top + chartH + 12)
-    }
-    ctx.textAlign = 'right'
-    for (let sy = 0; sy <= 5; sy += 1) {
-      ctx.fillText(sy, pad.left - 4, toCanvasY(sy) + 3)
-    }
-
-    // Plot the glaze point
-    const px = toCanvasX(x)
-    const py = toCanvasY(y)
-    ctx.beginPath()
-    ctx.arc(px, py, 6, 0, Math.PI * 2)
-    ctx.fillStyle = '#1a3a5c'
-    ctx.fill()
-    ctx.strokeStyle = 'white'
-    ctx.lineWidth = 2
-    ctx.stroke()
-
-    // Label the point
-    ctx.font = 'bold 10px -apple-system, sans-serif'
-    ctx.fillStyle = '#1a3a5c'
-    ctx.textAlign = 'left'
-    ctx.fillText(`Al₂O₃ ${x} / SiO₂ ${y}`, px + 10, py + 4)
-
-  }, [x, y])
+  const optionsMarkup = options.length > 0
+    ? options.map(name => (
+        <Listbox.Option key={name} value={name}>
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0'}}>
+            <span>{name}</span>
+            {!inLibrary(name) && (
+              <span style={{
+                fontSize: '11px',
+                color: '#aa7700',
+                background: '#fff8e1',
+                border: '1px solid #ffe082',
+                padding: '1px 7px',
+                borderRadius: '8px',
+                fontWeight: 600,
+                marginLeft: '8px',
+                flexShrink: 0,
+              }}>
+                not in library
+              </span>
+            )}
+          </div>
+        </Listbox.Option>
+      ))
+    : null
 
   return (
-    <div className="stull-chart-container">
-      <canvas ref={canvasRef} width={320} height={260} className="stull-canvas" />
-      <div className="stull-zone-badge" style={{ color: GLAZE_TYPE_COLORS[zone] }}>
-        Zone: {GLAZE_TYPE_LABELS[zone]}
-      </div>
+    <div style={{flex: 1}}>
+      <Combobox
+        activator={
+          <Combobox.TextField
+            label="Material"
+            labelHidden
+            value={inputValue}
+            onChange={handleInputChange}
+            onFocus={handleFocus}
+            onBlur={() => onBlur && onBlur(inputValue)}
+            placeholder={placeholder || 'Search materials...'}
+            autoComplete="off"
+          />
+        }
+      >
+        {optionsMarkup ? (
+          <Listbox onSelect={handleSelect}>
+            {optionsMarkup}
+          </Listbox>
+        ) : null}
+      </Combobox>
     </div>
   )
 }
 
-function RecipeForm({ onSave, onCancel }) {
+function RecipeForm({ recipe, onSave, onCancel, materials, onAddMaterial }) {
+  const isEdit = !!recipe
+
   const [activeTab, setActiveTab] = useState('details')
-  const [recipeType, setRecipeType] = useState('Glaze')
-  const [name, setName] = useState('')
-  const [cone, setCone] = useState('6')
-  const [atmosphere, setAtmosphere] = useState('oxidation')
-  const [status, setStatus] = useState('testing')
-  const [baseIngredients, setBaseIngredients] = useState([
-    { material: '', percent: '' },
-    { material: '', percent: '' },
-    { material: '', percent: '' },
-  ])
-  const [additives, setAdditives] = useState([
-    { material: '', percent: '' }
-  ])
+  const [recipeType, setRecipeType] = useState(recipe?.recipeType || 'Glaze')
+  const [name, setName] = useState(recipe?.name || '')
+  const [cone, setCone] = useState(recipe?.cone || '6')
+  const [atmosphere, setAtmosphere] = useState(recipe?.atmosphere || 'oxidation')
+  const [status, setStatus] = useState(recipe?.status || 'testing')
+  const [baseIngredients, setBaseIngredients] = useState(
+    recipe?.baseIngredients?.length > 0
+      ? recipe.baseIngredients.map(i => ({ material: i.material, percent: String(i.percent) }))
+      : [{ material: '', percent: '' }, { material: '', percent: '' }, { material: '', percent: '' }]
+  )
+  const [additives, setAdditives] = useState(
+    recipe?.additives?.length > 0
+      ? recipe.additives.map(i => ({ material: i.material, percent: String(i.percent) }))
+      : [{ material: '', percent: '' }]
+  )
   const [chemistry, setChemistry] = useState(null)
-  const [showStull, setShowStull] = useState(false)
-  const [notes, setNotes] = useState('')
+  const [notes, setNotes] = useState(recipe?.notes || '')
+
+  const [addMaterialModal, setAddMaterialModal] = useState(false)
+  const [pendingMaterialName, setPendingMaterialName] = useState('')
+  const [newMatAmount, setNewMatAmount] = useState('0')
+  const [newMatUnit, setNewMatUnit] = useState('g')
+  const [newMatApprox, setNewMatApprox] = useState(false)
 
   useEffect(() => {
     const valid = baseIngredients.filter(i => i.material && parseFloat(i.percent) > 0)
@@ -196,17 +165,25 @@ function RecipeForm({ onSave, onCancel }) {
       setChemistry(result)
     } else {
       setChemistry(null)
-      setShowStull(false)
     }
   }, [baseIngredients])
 
-  const addBaseIngredient = () => {
-    setBaseIngredients([...baseIngredients, { material: '', percent: '' }])
+  const checkAndPromptAdd = (name) => {
+    if (!name?.trim()) return
+    const inLibrary = (materials || []).some(
+      m => m.name.toLowerCase() === name.toLowerCase()
+    )
+    if (!inLibrary) {
+      setPendingMaterialName(name)
+      setAddMaterialModal(true)
+    }
   }
 
-  const removeBaseIngredient = (index) => {
+  const addBaseIngredient = () =>
+    setBaseIngredients([...baseIngredients, { material: '', percent: '' }])
+
+  const removeBaseIngredient = (index) =>
     setBaseIngredients(baseIngredients.filter((_, i) => i !== index))
-  }
 
   const updateBaseIngredient = (index, field, value) => {
     const updated = [...baseIngredients]
@@ -214,18 +191,35 @@ function RecipeForm({ onSave, onCancel }) {
     setBaseIngredients(updated)
   }
 
-  const addAdditive = () => {
+  const addAdditive = () =>
     setAdditives([...additives, { material: '', percent: '' }])
-  }
 
-  const removeAdditive = (index) => {
+  const removeAdditive = (index) =>
     setAdditives(additives.filter((_, i) => i !== index))
-  }
 
   const updateAdditive = (index, field, value) => {
     const updated = [...additives]
     updated[index] = { ...updated[index], [field]: value }
     setAdditives(updated)
+  }
+
+  const handleAddMaterialConfirm = () => {
+    if (onAddMaterial) {
+      onAddMaterial({
+        name: pendingMaterialName,
+        amount: parseFloat(newMatAmount) || 0,
+        startingAmount: parseFloat(newMatAmount) || 0,
+        unit: newMatUnit,
+        isApproximate: newMatApprox,
+        id: Date.now().toString(),
+        created: new Date().toISOString().split('T')[0],
+      })
+    }
+    setAddMaterialModal(false)
+    setPendingMaterialName('')
+    setNewMatAmount('0')
+    setNewMatUnit('g')
+    setNewMatApprox(false)
   }
 
   const baseTotal = baseIngredients.reduce((sum, i) => sum + (parseFloat(i.percent) || 0), 0)
@@ -244,10 +238,16 @@ function RecipeForm({ onSave, onCancel }) {
       percent: Math.round((parseFloat(i.percent) / total) * 1000) / 10
     }))
     onSave({
-      name: name.trim(), recipeType, cone, atmosphere, status,
+      ...(isEdit ? recipe : {}),
+      name: name.trim(),
+      recipeType,
+      cone,
+      atmosphere,
+      status,
       baseIngredients: normalisedBase,
       additives: additives.filter(i => i.material && parseFloat(i.percent) > 0),
-      chemistry, notes
+      chemistry,
+      notes
     })
   }
 
@@ -261,13 +261,13 @@ function RecipeForm({ onSave, onCancel }) {
   return (
     <div className="recipe-form">
 
-      {/* Recipe Type */}
       <div className="form-section">
         <label className="form-label">Recipe Type</label>
         <div className="type-pills">
           {RECIPE_TYPES.map(t => (
             <button
               key={t}
+              type="button"
               className={`type-pill ${recipeType === t ? 'active' : ''}`}
               onClick={() => setRecipeType(t)}
             >{t}</button>
@@ -275,7 +275,6 @@ function RecipeForm({ onSave, onCancel }) {
         </div>
       </div>
 
-      {/* Name */}
       <div className="form-section">
         <label className="form-label">Recipe Name</label>
         <input
@@ -287,7 +286,6 @@ function RecipeForm({ onSave, onCancel }) {
         />
       </div>
 
-      {/* Cone + Atmosphere */}
       <div className="form-row">
         <div className="form-section half">
           <label className="form-label">Cone</label>
@@ -307,7 +305,6 @@ function RecipeForm({ onSave, onCancel }) {
         </div>
       </div>
 
-      {/* Status */}
       <div className="form-section">
         <label className="form-label">Status</label>
         <select className="form-select" value={status} onChange={e => setStatus(e.target.value)}>
@@ -317,39 +314,37 @@ function RecipeForm({ onSave, onCancel }) {
         </select>
       </div>
 
-      {/* Tabs */}
       <div className="form-tabs">
         <button
+          type="button"
           className={`form-tab ${activeTab === 'details' ? 'active' : ''}`}
           onClick={() => setActiveTab('details')}
         >Recipe</button>
         <button
+          type="button"
           className={`form-tab ${activeTab === 'layering' ? 'active' : ''}`}
           onClick={() => setActiveTab('layering')}
         >Layering</button>
       </div>
 
-      {/* Details Tab */}
       {activeTab === 'details' && (
         <>
-          {/* Base Glaze */}
           <div className="form-section">
             <div className="section-header">
               <label className="form-label">Base</label>
-              <span className="section-hint">Totals 100%</span>
+              <span className="section-hint">
+                Total: {baseTotal.toFixed(1)} → normalised to 100%
+              </span>
             </div>
             {baseIngredients.map((ing, index) => (
               <div key={index} className="ingredient-row">
-                <select
-                  className="form-select material-select"
+                <IngredientCombobox
                   value={ing.material}
-                  onChange={e => updateBaseIngredient(index, 'material', e.target.value)}
-                >
-                  <option value="">Select material...</option>
-                  {MATERIAL_NAMES.map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
+                  materials={materials}
+                  placeholder="Search materials..."
+                  onChange={(val) => updateBaseIngredient(index, 'material', val)}
+                  onBlur={(val) => checkAndPromptAdd(val)}
+                />
                 <input
                   className="form-input parts-input"
                   type="number"
@@ -360,15 +355,20 @@ function RecipeForm({ onSave, onCancel }) {
                 <span className="normalised-pct">
                   {getNormalisedPercent(ing.percent) ? `${getNormalisedPercent(ing.percent)}%` : '—'}
                 </span>
-                <button className="remove-btn" onClick={() => removeBaseIngredient(index)}>✕</button>
+                <button
+                  type="button"
+                  className="remove-btn"
+                  onClick={() => removeBaseIngredient(index)}
+                >✕</button>
               </div>
             ))}
-            <button className="add-ingredient-btn" onClick={addBaseIngredient}>
-              + Add Ingredient
-            </button>
+            <button
+              type="button"
+              className="add-ingredient-btn"
+              onClick={addBaseIngredient}
+            >+ Add Ingredient</button>
           </div>
 
-          {/* Additives */}
           <div className="form-section">
             <div className="section-header">
               <label className="form-label">Additives</label>
@@ -376,16 +376,13 @@ function RecipeForm({ onSave, onCancel }) {
             </div>
             {additives.map((add, index) => (
               <div key={index} className="ingredient-row">
-                <select
-                  className="form-select material-select"
+                <IngredientCombobox
                   value={add.material}
-                  onChange={e => updateAdditive(index, 'material', e.target.value)}
-                >
-                  <option value="">Select material...</option>
-                  {MATERIAL_NAMES.map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
+                  materials={materials}
+                  placeholder="Search materials..."
+                  onChange={(val) => updateAdditive(index, 'material', val)}
+                  onBlur={(val) => checkAndPromptAdd(val)}
+                />
                 <input
                   className="form-input parts-input"
                   type="number"
@@ -394,15 +391,20 @@ function RecipeForm({ onSave, onCancel }) {
                   onChange={e => updateAdditive(index, 'percent', e.target.value)}
                 />
                 <span className="normalised-pct"></span>
-                <button className="remove-btn" onClick={() => removeAdditive(index)}>✕</button>
+                <button
+                  type="button"
+                  className="remove-btn"
+                  onClick={() => removeAdditive(index)}
+                >✕</button>
               </div>
             ))}
-            <button className="add-ingredient-btn" onClick={addAdditive}>
-              + Add Additive
-            </button>
+            <button
+              type="button"
+              className="add-ingredient-btn"
+              onClick={addAdditive}
+            >+ Add Additive</button>
           </div>
 
-          {/* Live Chemistry */}
           {chemistry && (
             <div className="chemistry-panel">
               <h3 className="chemistry-title">Live Chemistry</h3>
@@ -466,25 +468,14 @@ function RecipeForm({ onSave, onCancel }) {
                 </div>
               </div>
 
-              {/* Stull Chart Toggle */}
-              <button
-                className="stull-btn"
-                onClick={() => setShowStull(!showStull)}
-              >
-                {showStull ? 'Hide Stull Chart' : 'Show Stull Chart'}
-              </button>
-
-              {showStull && (
-                <StullChart
-                  x={chemistry.stull.x}
-                  y={chemistry.stull.y}
-                  zone={chemistry.stull.zone}
-                />
-              )}
+              <StullChart
+                al2o3={chemistry.stull.x}
+                sio2={chemistry.stull.y}
+                zone={chemistry.stull.zone}
+              />
             </div>
           )}
 
-          {/* Notes */}
           <div className="form-section">
             <label className="form-label">Notes</label>
             <textarea
@@ -498,7 +489,6 @@ function RecipeForm({ onSave, onCancel }) {
         </>
       )}
 
-      {/* Layering Tab */}
       {activeTab === 'layering' && (
         <div className="layering-panel">
           <div className="layering-intro">
@@ -514,11 +504,62 @@ function RecipeForm({ onSave, onCancel }) {
         </div>
       )}
 
-      {/* Actions */}
       <div className="form-actions">
-        <button className="cancel-btn" onClick={onCancel}>Cancel</button>
-        <button className="save-btn" onClick={handleSave}>Save Recipe</button>
+        <button type="button" className="cancel-btn" onClick={onCancel}>Cancel</button>
+        <button type="button" className="save-btn" onClick={handleSave}>
+          {isEdit ? 'Save Changes' : 'Save Recipe'}
+        </button>
       </div>
+
+      <Modal
+        open={addMaterialModal}
+        onClose={() => setAddMaterialModal(false)}
+        title={`Add "${pendingMaterialName}" to your Materials library`}
+        primaryAction={{
+          content: 'Add to Library',
+          onAction: handleAddMaterialConfirm
+        }}
+        secondaryActions={[{
+          content: 'Skip for now',
+          onAction: () => setAddMaterialModal(false)
+        }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            <Text tone="subdued">
+              This material isn't in your library yet. Add it now so inventory can be tracked. You can update the amount later.
+            </Text>
+            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignItems: 'start'}}>
+              <TextField
+                label="Amount on hand"
+                type="number"
+                value={newMatAmount}
+                onChange={setNewMatAmount}
+                autoComplete="off"
+                helpText="Enter 0 if unknown"
+              />
+              <Select
+                label="Unit"
+                options={UNITS}
+                value={newMatUnit}
+                onChange={setNewMatUnit}
+              />
+            </div>
+            <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+              <input
+                type="checkbox"
+                id="new-mat-approx"
+                checked={newMatApprox}
+                onChange={e => setNewMatApprox(e.target.checked)}
+                style={{width: '16px', height: '16px', cursor: 'pointer'}}
+              />
+              <label htmlFor="new-mat-approx" style={{fontSize: '14px', cursor: 'pointer'}}>
+                This is an estimate
+              </label>
+            </div>
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
 
     </div>
   )
