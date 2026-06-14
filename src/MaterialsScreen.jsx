@@ -20,6 +20,13 @@ const UNITS = [
   { label: 'ounces (oz)', value: 'oz' },
 ]
 
+const PRICE_UNITS = [
+  { label: 'per kg', value: 'kg' },
+  { label: 'per lb', value: 'lb' },
+  { label: 'per oz', value: 'oz' },
+  { label: 'per g', value: 'g' },
+]
+
 const STATUS_BADGE = {
   ok: null,
   low: <Badge tone="warning">Low</Badge>,
@@ -31,7 +38,9 @@ function MaterialForm({ existing, onSave, onCancel }) {
   const [amount, setAmount] = useState(existing ? String(existing.amount) : '')
   const [unit, setUnit] = useState(existing?.unit || 'g')
   const [isApproximate, setIsApproximate] = useState(existing?.isApproximate || false)
-  const [supplier, setSupplier] = useState(existing?.supplier || '')
+  const [price, setPrice] = useState(existing?.price ? String(existing.price) : '')
+  const [priceUnit, setPriceUnit] = useState(existing?.priceUnit || 'kg')
+  const [priceApproximate, setPriceApproximate] = useState(existing?.priceApproximate || false)
   const [notes, setNotes] = useState(existing?.notes || '')
 
   const handleSave = () => {
@@ -45,7 +54,9 @@ function MaterialForm({ existing, onSave, onCancel }) {
       startingAmount: existing ? existing.startingAmount : amt,
       unit,
       isApproximate,
-      supplier: supplier.trim(),
+      price: price ? parseFloat(price) : null,
+      priceUnit,
+      priceApproximate,
       notes: notes.trim(),
       id: existing?.id || Date.now().toString(),
       created: existing?.created || new Date().toISOString().split('T')[0],
@@ -54,60 +65,106 @@ function MaterialForm({ existing, onSave, onCancel }) {
 
   return (
     <div className="material-form">
-      <BlockStack gap="300">
-        <TextField
-          label="Material name"
-          placeholder="e.g. Custer Feldspar"
-          value={name}
-          onChange={setName}
-          autoComplete="off"
-        />
-        <InlineStack gap="300" blockAlign="end">
-          <div style={{flex: 1}}>
+      <BlockStack gap="400">
+
+        <Card>
+          <BlockStack gap="300">
+            <Text variant="headingSm">Material</Text>
             <TextField
-              label="Amount on hand"
-              type="number"
-              value={amount}
-              onChange={setAmount}
+              label="Material name"
+              placeholder="e.g. Custer Feldspar"
+              value={name}
+              onChange={setName}
               autoComplete="off"
             />
-          </div>
-          <div style={{flex: 1}}>
-            <Select
-              label="Unit"
-              options={UNITS}
-              value={unit}
-              onChange={setUnit}
+            <InlineStack gap="300" blockAlign="end">
+              <div style={{flex: 1}}>
+                <TextField
+                  label="Amount on hand"
+                  type="number"
+                  value={amount}
+                  onChange={setAmount}
+                  autoComplete="off"
+                />
+              </div>
+              <div style={{flex: 1}}>
+                <Select
+                  label="Unit"
+                  options={UNITS}
+                  value={unit}
+                  onChange={setUnit}
+                />
+              </div>
+            </InlineStack>
+            <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+              <input
+                type="checkbox"
+                id="approx"
+                checked={isApproximate}
+                onChange={e => setIsApproximate(e.target.checked)}
+                style={{width: '16px', height: '16px', cursor: 'pointer'}}
+              />
+              <label htmlFor="approx" style={{fontSize: '14px', color: '#1a1a1a', cursor: 'pointer'}}>
+                This is an estimate (~approx)
+              </label>
+            </div>
+          </BlockStack>
+        </Card>
+
+        <Card>
+          <BlockStack gap="300">
+            <Text variant="headingSm">Price (CAD)</Text>
+            <InlineStack gap="300" blockAlign="end">
+              <div style={{flex: 1}}>
+                <TextField
+                  label="Price"
+                  type="number"
+                  placeholder="e.g. 24.99"
+                  value={price}
+                  onChange={setPrice}
+                  autoComplete="off"
+                  prefix="$"
+                />
+              </div>
+              <div style={{flex: 1}}>
+                <Select
+                  label="Per unit"
+                  options={PRICE_UNITS}
+                  value={priceUnit}
+                  onChange={setPriceUnit}
+                />
+              </div>
+            </InlineStack>
+            <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+              <input
+                type="checkbox"
+                id="price-approx"
+                checked={priceApproximate}
+                onChange={e => setPriceApproximate(e.target.checked)}
+                style={{width: '16px', height: '16px', cursor: 'pointer'}}
+              />
+              <label htmlFor="price-approx" style={{fontSize: '14px', color: '#1a1a1a', cursor: 'pointer'}}>
+                Price is estimated
+              </label>
+            </div>
+          </BlockStack>
+        </Card>
+
+        <Card>
+          <BlockStack gap="300">
+            <Text variant="headingSm">Notes (optional)</Text>
+            <TextField
+              label="Notes"
+              labelHidden
+              value={notes}
+              onChange={setNotes}
+              multiline={2}
+              autoComplete="off"
             />
-          </div>
-        </InlineStack>
-        <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-          <input
-            type="checkbox"
-            id="approx"
-            checked={isApproximate}
-            onChange={e => setIsApproximate(e.target.checked)}
-            style={{width: '16px', height: '16px', cursor: 'pointer'}}
-          />
-          <label htmlFor="approx" style={{fontSize: '14px', color: '#1a1a1a', cursor: 'pointer'}}>
-            This is an estimate (~approx)
-          </label>
-        </div>
-        <TextField
-          label="Supplier (optional)"
-          placeholder="e.g. Digitalfire, Sheffield Pottery"
-          value={supplier}
-          onChange={setSupplier}
-          autoComplete="off"
-        />
-        <TextField
-          label="Notes (optional)"
-          value={notes}
-          onChange={setNotes}
-          multiline={2}
-          autoComplete="off"
-        />
-        <div style={{display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '8px'}}>
+          </BlockStack>
+        </Card>
+
+        <div style={{display: 'flex', justifyContent: 'flex-end', gap: '8px', padding: '8px 0 24px'}}>
           <button
             type="button"
             onClick={onCancel}
@@ -123,6 +180,7 @@ function MaterialForm({ existing, onSave, onCancel }) {
             {existing ? 'Save Changes' : 'Add Material'}
           </button>
         </div>
+
       </BlockStack>
     </div>
   )
@@ -156,16 +214,14 @@ export default function MaterialsScreen({ materials, onSaveMaterial, onDeleteMat
           }
         }}
       >
-        <Card>
-          <MaterialForm
-            existing={editingMaterial || null}
-            onSave={handleSave}
-            onCancel={() => {
-              setShowForm(false)
-              setEditingMaterial(null)
-            }}
-          />
-        </Card>
+        <MaterialForm
+          existing={editingMaterial || null}
+          onSave={handleSave}
+          onCancel={() => {
+            setShowForm(false)
+            setEditingMaterial(null)
+          }}
+        />
       </Page>
     )
   }
@@ -206,6 +262,9 @@ export default function MaterialsScreen({ materials, onSaveMaterial, onDeleteMat
             {filtered.map((material, i) => {
               const status = getStockStatus(material)
               const amountDisplay = `${material.amount} ${material.unit}`
+              const priceDisplay = material.price
+                ? `$${material.price.toFixed(2)}/${material.priceUnit}${material.priceApproximate ? ' (est.)' : ''}`
+                : null
               return (
                 <div
                   key={material.id}
@@ -218,8 +277,8 @@ export default function MaterialsScreen({ materials, onSaveMaterial, onDeleteMat
                         <span className="approx-badge">~approx</span>
                       )}
                     </div>
-                    {material.supplier && (
-                      <div className="material-row-supplier">{material.supplier}</div>
+                    {priceDisplay && (
+                      <div className="material-row-price">{priceDisplay}</div>
                     )}
                   </div>
                   <div className="material-row-right">
