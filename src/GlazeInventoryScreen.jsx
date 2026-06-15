@@ -1,4 +1,3 @@
-
 import { useState } from 'react'
 import {
   Page,
@@ -571,7 +570,7 @@ export default function GlazeInventoryScreen({
                     }}>
                       {STATUS_LABELS[status]}
                     </span>
-                    {!isCommercial && entry.sg && (
+                    {!isCommercial && entry.sg && !isNaN(Number(entry.sg)) && (
                       <span style={{fontSize: '12px', color: '#888'}}>SG {entry.sg}</span>
                     )}
                   </div>
