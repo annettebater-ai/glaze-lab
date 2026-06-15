@@ -2,20 +2,24 @@ export function glazeInventoryToMarkdown(entry) {
   return `---
 type: glaze-inventory
 id: ${entry.id}
-recipe-id: ${entry.recipeId}
-recipe-slug: ${entry.recipeSlug}
-recipe-name: ${entry.recipeName}
-date-mixed: ${entry.dateMixed}
-batch-size: ${entry.batchSize}
-batch-unit: ${entry.batchUnit}
-batch-grams: ${entry.batchGrams}
+entry-type: ${entry.entryType || 'mixed'}
+recipe-id: ${entry.recipeId || ''}
+recipe-slug: ${entry.recipeSlug || ''}
+recipe-name: ${entry.recipeName || ''}
+brand: ${entry.brand || ''}
+colour: ${entry.colour || ''}
+cone-range: ${entry.coneRange || ''}
+date-mixed: ${entry.dateMixed || ''}
+batch-size: ${entry.batchSize || ''}
+batch-unit: ${entry.batchUnit || ''}
+batch-grams: ${entry.batchGrams || ''}
 batch-cost: ${entry.batchCost || ''}
 batch-cost-estimated: ${entry.batchCostEstimated ? 'true' : 'false'}
 is-low: ${entry.isLow ? 'true' : 'false'}
 is-used-up: ${entry.isUsedUp ? 'true' : 'false'}
 sg: ${entry.sg || ''}
 notes: ${entry.notes || ''}
-created: ${entry.dateMixed}
+created: ${entry.dateMixed || new Date().toISOString().split('T')[0]}
 modified: ${new Date().toISOString().split('T')[0]}
 ---
 
@@ -39,9 +43,13 @@ export function markdownToGlazeInventory(content, fileId) {
     return {
       fileId,
       id: get('id') || fileId,
+      entryType: get('entry-type') || 'mixed',
       recipeId: get('recipe-id'),
       recipeSlug: get('recipe-slug'),
       recipeName: get('recipe-name'),
+      brand: get('brand'),
+      colour: get('colour'),
+      coneRange: get('cone-range'),
       dateMixed: get('date-mixed'),
       batchSize: parseFloat(get('batch-size')) || 0,
       batchUnit: get('batch-unit') || 'g',
