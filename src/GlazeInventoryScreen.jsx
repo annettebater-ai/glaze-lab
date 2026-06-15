@@ -8,6 +8,7 @@ import {
   Badge,
   Modal,
   TextField,
+  Select,
   Spinner,
 } from '@shopify/polaris'
 import DriveImage from './DriveImage'
@@ -59,49 +60,23 @@ function CommercialGlazeForm({ existing, onSave, onCancel }) {
 
   return (
     <BlockStack gap="300">
-      <TextField
-        label="Product name"
-        placeholder="e.g. Cobalt Blue Satin"
-        value={name}
-        onChange={val => { setName(val); if (errors.name) setErrors({}) }}
-        error={errors.name}
-        autoComplete="off"
-      />
+      <TextField label="Product name" placeholder="e.g. Cobalt Blue Satin"
+        value={name} onChange={val => { setName(val); if (errors.name) setErrors({}) }}
+        error={errors.name} autoComplete="off" />
       <InlineStack gap="300">
         <div style={{flex: 1}}>
-          <TextField
-            label="Brand"
-            placeholder="e.g. Amaco, Duncan"
-            value={brand}
-            onChange={setBrand}
-            autoComplete="off"
-          />
+          <TextField label="Brand" placeholder="e.g. Amaco, Duncan"
+            value={brand} onChange={setBrand} autoComplete="off" />
         </div>
         <div style={{flex: 1}}>
-          <TextField
-            label="Cone range"
-            placeholder="e.g. 06-6"
-            value={coneRange}
-            onChange={setConeRange}
-            autoComplete="off"
-          />
+          <TextField label="Cone range" placeholder="e.g. 06-6"
+            value={coneRange} onChange={setConeRange} autoComplete="off" />
         </div>
       </InlineStack>
-      <TextField
-        label="Colour description"
-        placeholder="e.g. Deep cobalt, semi-matte"
-        value={colour}
-        onChange={setColour}
-        autoComplete="off"
-      />
-      <TextField
-        label="Notes"
-        placeholder="Any notes about this glaze..."
-        value={notes}
-        onChange={setNotes}
-        multiline={2}
-        autoComplete="off"
-      />
+      <TextField label="Colour description" placeholder="e.g. Deep cobalt, semi-matte"
+        value={colour} onChange={setColour} autoComplete="off" />
+      <TextField label="Notes" placeholder="Any notes about this glaze..."
+        value={notes} onChange={setNotes} multiline={2} autoComplete="off" />
       <InlineStack gap="300" align="end">
         <button type="button" onClick={onCancel}
           style={{padding: '9px 18px', background: 'white', color: '#1a1a1a', border: '1px solid #c9cccf', borderRadius: '6px', fontSize: '14px', fontWeight: 600, cursor: 'pointer'}}>
@@ -166,14 +141,10 @@ function GlazeInventoryDetail({
 
       const prompt = isCommercial
         ? `I have a commercial glaze: "${entry.recipeName}" by ${entry.brand || 'unknown brand'}, cone range ${entry.coneRange || 'unknown'}, colour: ${entry.colour || 'unknown'}.
-
 My other glazes include: ${otherGlazes.map(g => g.name).join(', ')}
-
 Suggest layering combinations and application order. Be concise and practical.`
         : `I have a glaze called "${entry.recipeName}" with chemistry zone: ${thisRecipe?.chemistry?.stull?.zone || 'unknown'}.
-
 My other glazes: ${otherGlazes.map(g => `${g.name} (${g.zone})`).join(', ')}
-
 Suggest layering combinations and application order. What works well together and what to avoid? Be concise and practical.`
 
       const response = await fetch('/api/claude', {
@@ -239,21 +210,19 @@ Suggest layering combinations and application order. What works well together an
               <Badge tone={STATUS_TONES[status]}>{STATUS_LABELS[status]}</Badge>
             </InlineStack>
 
-            <div>
-              <div style={{display: 'flex', gap: '6px'}}>
-                {STATUS_OPTIONS.map(s => (
-                  <button key={s} type="button" onClick={() => handleStatusChange(s)}
-                    style={{
-                      padding: '6px 12px', borderRadius: '6px',
-                      border: `1px solid ${status === s ? '#1a3a5c' : '#c9cccf'}`,
-                      background: status === s ? '#1a3a5c' : 'white',
-                      color: status === s ? 'white' : '#616161',
-                      fontSize: '13px', fontWeight: 500, cursor: 'pointer',
-                    }}>
-                    {STATUS_LABELS[s]}
-                  </button>
-                ))}
-              </div>
+            <div style={{display: 'flex', gap: '6px'}}>
+              {STATUS_OPTIONS.map(s => (
+                <button key={s} type="button" onClick={() => handleStatusChange(s)}
+                  style={{
+                    padding: '6px 12px', borderRadius: '6px',
+                    border: `1px solid ${status === s ? '#1a3a5c' : '#c9cccf'}`,
+                    background: status === s ? '#1a3a5c' : 'white',
+                    color: status === s ? 'white' : '#616161',
+                    fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+                  }}>
+                  {STATUS_LABELS[s]}
+                </button>
+              ))}
             </div>
 
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', borderTop: '1px solid #f0f0f0'}}>
@@ -332,7 +301,7 @@ Suggest layering combinations and application order. What works well together an
                       ))}
                     </div>
                   </div>
-                  {r.layers.map((l, li) => (
+                  {r.layers?.map((l, li) => (
                     <div key={li} style={{display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#555', padding: '2px 0'}}>
                       <span style={{width: '18px', height: '18px', borderRadius: '50%', background: '#1a3a5c', color: 'white', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0}}>{li + 1}</span>
                       <span style={{fontWeight: 500}}>{l.type}</span>
@@ -451,11 +420,7 @@ export default function GlazeInventoryScreen({
       if (tab === 'commercial') return e.entryType === 'commercial'
       return true
     })
-    .sort((a, b) => {
-      if (a.isUsedUp && !b.isUsedUp) return 1
-      if (!a.isUsedUp && b.isUsedUp) return -1
-      return new Date(b.dateMixed) - new Date(a.dateMixed)
-    })
+    .sort((a, b) => (a.recipeName || '').localeCompare(b.recipeName || ''))
 
   const handleSaveCommercial = (entry) => {
     onUpdateEntry(entry)
@@ -512,16 +477,9 @@ export default function GlazeInventoryScreen({
         </div>
 
         <Card>
-          <TextField
-            label="Search"
-            labelHidden
-            placeholder="Search glazes..."
-            value={search}
-            onChange={setSearch}
-            autoComplete="off"
-            clearButton
-            onClearButtonClick={() => setSearch('')}
-          />
+          <TextField label="Search" labelHidden placeholder="Search glazes..."
+            value={search} onChange={setSearch} autoComplete="off"
+            clearButton onClearButtonClick={() => setSearch('')} />
         </Card>
 
         {filtered.length === 0 ? (
@@ -533,51 +491,71 @@ export default function GlazeInventoryScreen({
             </div>
           </Card>
         ) : (
-          <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
-            {filtered.map(entry => {
-              const status = getStatus(entry)
-              const isCommercial = entry.entryType === 'commercial'
-              return (
-                <div
-                  key={entry.id}
-                  onClick={() => setSelectedEntry(entry)}
-                  style={{
-                    background: 'white',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    border: '1px solid #e8e8e8',
-                    cursor: 'pointer',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                  }}
-                >
-                  <div style={{fontSize: '11px', color: '#2d6a9f', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600, marginBottom: '4px'}}>
-                    {isCommercial ? `Commercial${entry.brand ? ` · ${entry.brand}` : ''}` : `Mixed · ${entry.dateMixed}`}
+          <Card padding="0">
+            <div>
+              {/* Table header */}
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 120px 100px 80px', padding: '10px 16px', borderBottom: '1px solid #f0f0f0', background: '#fafafa'}}>
+                <Text variant="bodySm" fontWeight="semibold" tone="subdued">Name</Text>
+                <Text variant="bodySm" fontWeight="semibold" tone="subdued">Type</Text>
+                <Text variant="bodySm" fontWeight="semibold" tone="subdued">Date</Text>
+                <Text variant="bodySm" fontWeight="semibold" tone="subdued">Status</Text>
+              </div>
+              {filtered.map((entry, index) => {
+                const status = getStatus(entry)
+                const isCommercial = entry.entryType === 'commercial'
+                return (
+                  <div
+                    key={entry.id}
+                    onClick={() => setSelectedEntry(entry)}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 120px 100px 80px',
+                      padding: '12px 16px',
+                      borderBottom: index < filtered.length - 1 ? '1px solid #f5f5f5' : 'none',
+                      cursor: 'pointer',
+                      background: 'white',
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#fafafa'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                  >
+                    <div>
+                      <div style={{fontSize: '14px', fontWeight: 600, color: '#1a1a1a'}}>{entry.recipeName}</div>
+                      {isCommercial && entry.brand && (
+                        <div style={{fontSize: '12px', color: '#888'}}>{entry.brand}{entry.colour ? ` · ${entry.colour}` : ''}</div>
+                      )}
+                      {!isCommercial && entry.batchSize > 0 && (
+                        <div style={{fontSize: '12px', color: '#888'}}>{entry.batchSize}{entry.batchUnit}</div>
+                      )}
+                    </div>
+                    <div style={{display: 'flex', alignItems: 'center'}}>
+                      <span style={{
+                        fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '8px',
+                        background: isCommercial ? '#e8f0fe' : '#f0f0f0',
+                        color: isCommercial ? '#1a3a5c' : '#555',
+                      }}>
+                        {isCommercial ? 'Commercial' : 'Mixed'}
+                      </span>
+                    </div>
+                    <div style={{display: 'flex', alignItems: 'center'}}>
+                      <Text variant="bodySm" tone="subdued">
+                        {isCommercial ? (entry.coneRange ? `Cone ${entry.coneRange}` : '—') : (entry.dateMixed || '—')}
+                      </Text>
+                    </div>
+                    <div style={{display: 'flex', alignItems: 'center'}}>
+                      <span style={{
+                        fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '8px', textTransform: 'uppercase',
+                        background: status === 'used-up' ? '#fff0f0' : status === 'low' ? '#fff8e1' : '#d4edda',
+                        color: status === 'used-up' ? '#cc2200' : status === 'low' ? '#aa7700' : '#155724',
+                      }}>
+                        {STATUS_LABELS[status]}
+                      </span>
+                    </div>
                   </div>
-                  <div style={{fontSize: '16px', fontWeight: 700, color: '#1a1a1a', marginBottom: '4px'}}>
-                    {entry.recipeName}
-                  </div>
-                  <div style={{fontSize: '13px', color: '#888', marginBottom: '12px'}}>
-                    {isCommercial
-                      ? [entry.colour, entry.coneRange ? `Cone ${entry.coneRange}` : ''].filter(Boolean).join(' · ')
-                      : [entry.batchSize ? `${entry.batchSize}${entry.batchUnit}` : '', entry.batchCost ? `$${entry.batchCost.toFixed(2)}` : ''].filter(Boolean).join(' · ')
-                    }
-                  </div>
-                  <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '10px', borderTop: '1px solid #f0f0f0'}}>
-                    <span style={{
-                      fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '10px', textTransform: 'uppercase', letterSpacing: '0.3px',
-                      background: status === 'used-up' ? '#fff0f0' : status === 'low' ? '#fff8e1' : '#d4edda',
-                      color: status === 'used-up' ? '#cc2200' : status === 'low' ? '#aa7700' : '#155724',
-                    }}>
-                      {STATUS_LABELS[status]}
-                    </span>
-                    {!isCommercial && Number(entry.sg) > 0 && (
-                      <span style={{fontSize: '12px', color: '#888'}}>SG {Number(entry.sg).toFixed(2)}</span>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          </Card>
         )}
 
       </BlockStack>
