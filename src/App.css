@@ -301,3 +301,22 @@ body,
 [class*="Polaris-Page"] {
   background: #f5f0e8 !important;
 }
+/* ── Inventory cards ── */
+.inventory-card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid #e8e8e8;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  transition: box-shadow 0.15s;
+}
+
+.inventory-card:hover {
+  box-shadow: 0 3px 12px rgba(0,0,0,0.1);
+}
+
+.inventory-card-type {
+  font-size: 11px;
+  color: #2d6a9f;
+  text-transform:

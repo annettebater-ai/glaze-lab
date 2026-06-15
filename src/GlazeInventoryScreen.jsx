@@ -1,3 +1,4 @@
+
 import { useState } from 'react'
 import {
   Page,
@@ -8,7 +9,6 @@ import {
   Badge,
   Modal,
   TextField,
-  Select,
   Spinner,
 } from '@shopify/polaris'
 import DriveImage from './DriveImage'
@@ -534,34 +534,46 @@ export default function GlazeInventoryScreen({
             </div>
           </Card>
         ) : (
-          <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+          <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
             {filtered.map(entry => {
               const status = getStatus(entry)
               const isCommercial = entry.entryType === 'commercial'
               return (
-                <div key={entry.id} className="recipe-card" onClick={() => setSelectedEntry(entry)} style={{cursor: 'pointer'}}>
-                  <div className="recipe-card-top">
-                    <div className="recipe-card-left">
-                      <div className="recipe-card-type">
-                        {isCommercial ? `Commercial${entry.brand ? ` · ${entry.brand}` : ''}` : `Mixed · ${entry.dateMixed}`}
-                      </div>
-                      <div className="recipe-card-name">{entry.recipeName}</div>
-                      <div className="recipe-card-meta">
-                        {isCommercial
-                          ? [entry.colour, entry.coneRange ? `Cone ${entry.coneRange}` : ''].filter(Boolean).join(' · ')
-                          : [entry.batchSize ? `${entry.batchSize}${entry.batchUnit}` : '', entry.batchCost ? `$${entry.batchCost.toFixed(2)}` : ''].filter(Boolean).join(' · ')
-                        }
-                      </div>
-                    </div>
-                    <div className="recipe-card-right">
-                      <span style={{
-                        fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '10px',
-                        background: status === 'used-up' ? '#fff0f0' : status === 'low' ? '#fff8e1' : '#d4edda',
-                        color: status === 'used-up' ? '#cc2200' : status === 'low' ? '#aa7700' : '#155724',
-                      }}>
-                        {STATUS_LABELS[status]}
-                      </span>
-                    </div>
+                <div
+                  key={entry.id}
+                  onClick={() => setSelectedEntry(entry)}
+                  style={{
+                    background: 'white',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    border: '1px solid #e8e8e8',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                  }}
+                >
+                  <div style={{fontSize: '11px', color: '#2d6a9f', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600, marginBottom: '4px'}}>
+                    {isCommercial ? `Commercial${entry.brand ? ` · ${entry.brand}` : ''}` : `Mixed · ${entry.dateMixed}`}
+                  </div>
+                  <div style={{fontSize: '16px', fontWeight: 700, color: '#1a1a1a', marginBottom: '4px'}}>
+                    {entry.recipeName}
+                  </div>
+                  <div style={{fontSize: '13px', color: '#888', marginBottom: '12px'}}>
+                    {isCommercial
+                      ? [entry.colour, entry.coneRange ? `Cone ${entry.coneRange}` : ''].filter(Boolean).join(' · ')
+                      : [entry.batchSize ? `${entry.batchSize}${entry.batchUnit}` : '', entry.batchCost ? `$${entry.batchCost.toFixed(2)}` : ''].filter(Boolean).join(' · ')
+                    }
+                  </div>
+                  <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '10px', borderTop: '1px solid #f0f0f0'}}>
+                    <span style={{
+                      fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '10px', textTransform: 'uppercase', letterSpacing: '0.3px',
+                      background: status === 'used-up' ? '#fff0f0' : status === 'low' ? '#fff8e1' : '#d4edda',
+                      color: status === 'used-up' ? '#cc2200' : status === 'low' ? '#aa7700' : '#155724',
+                    }}>
+                      {STATUS_LABELS[status]}
+                    </span>
+                    {!isCommercial && entry.sg && (
+                      <span style={{fontSize: '12px', color: '#888'}}>SG {entry.sg}</span>
+                    )}
                   </div>
                 </div>
               )
