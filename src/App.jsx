@@ -465,7 +465,6 @@ function App() {
     const batchGrams = sessionData.batchGrams
     if (!batchGrams || !recipe) return
 
-    // Deduct materials
     const allIngredients = [
       ...(recipe.baseIngredients || []),
       ...(recipe.additives || [])
@@ -492,7 +491,6 @@ function App() {
     }
     setMaterials(updatedMaterials)
 
-    // Auto-create glaze inventory entry
     const inventoryEntry = {
       id: sessionData.id || Date.now().toString(),
       recipeId: recipe.id,
@@ -638,9 +636,7 @@ function App() {
           objectTypes={objectTypes}
           onUpdateEntry={handleSaveGlazeInventoryEntry}
           onDeleteEntry={handleDeleteGlazeInventoryEntry}
-          onMixNew={(recipe) => {
-            setMixingRecipe(recipe)
-          }}
+          onMixNew={(recipe) => setMixingRecipe(recipe)}
         />
       )
     }
@@ -652,19 +648,13 @@ function App() {
             title={editingRecipe ? 'Edit Recipe' : 'New Recipe'}
             backAction={{
               content: 'Recipes',
-              onAction: () => {
-                setShowNewRecipe(false)
-                setEditingRecipe(null)
-              }
+              onAction: () => { setShowNewRecipe(false); setEditingRecipe(null) }
             }}
           >
             <RecipeForm
               recipe={editingRecipe}
               onSave={handleSaveRecipe}
-              onCancel={() => {
-                setShowNewRecipe(false)
-                setEditingRecipe(null)
-              }}
+              onCancel={() => { setShowNewRecipe(false); setEditingRecipe(null) }}
               materials={materials}
               onAddMaterial={handleSaveMaterial}
             />
@@ -701,10 +691,7 @@ function App() {
           title="Recipes"
           primaryAction={{
             content: 'New Recipe',
-            onAction: () => {
-              setEditingRecipe(null)
-              setShowNewRecipe(true)
-            }
+            onAction: () => { setEditingRecipe(null); setShowNewRecipe(true) }
           }}
         >
           <BlockStack gap="400">
@@ -733,6 +720,7 @@ function App() {
         <TestsScreen
           testResults={testResults}
           recipes={recipes}
+          clayBodies={clayBodies}
           onSaveTestResult={handleSaveTestResult}
           onDeleteTestResult={handleDeleteTestResult}
           accessToken={accessToken}
@@ -786,11 +774,7 @@ function App() {
         <div className="topbar-search">
           <div className="topbar-search-field" onClick={() => handleNavigate('search')}>
             <SearchIcon />
-            <input
-              type="text"
-              placeholder="Search recipes, materials..."
-              readOnly
-            />
+            <input type="text" placeholder="Search recipes, materials..." readOnly />
           </div>
         </div>
         <div className="topbar-right">

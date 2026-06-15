@@ -4,6 +4,7 @@ export function testResultToMarkdown(result) {
     .join('\n')
 
   const photosJson = JSON.stringify(result.photos || [])
+  const preFirePhotosJson = JSON.stringify(result.preFirePhotos || [])
 
   return `---
 type: test-result
@@ -16,8 +17,13 @@ date: ${result.date}
 status: ${result.status}
 application-method: ${result.applicationMethod || ''}
 application-thickness: ${result.thickness || ''}
+num-dips: ${result.numDips || ''}
+dip-duration: ${result.dipDuration || ''}
+firing-type: ${result.firingType || ''}
+cone-reached: ${result.coneReached || ''}
 rating: ${result.rating || 0}
 photos: '${photosJson}'
+pre-fire-photos: '${preFirePhotosJson}'
 created: ${result.date}
 modified: ${new Date().toISOString().split('T')[0]}
 ---
@@ -71,6 +77,14 @@ export function markdownToTestResult(content, fileId) {
       photos = []
     }
 
+    let preFirePhotos = []
+    try {
+      const preRaw = get('pre-fire-photos').replace(/^'|'$/g, '')
+      preFirePhotos = JSON.parse(preRaw)
+    } catch {
+      preFirePhotos = []
+    }
+
     const layersText = getSection('Layering Order')
     const layers = layersText && layersText !== 'Not recorded'
       ? layersText.split('\n').map(l => {
@@ -90,8 +104,13 @@ export function markdownToTestResult(content, fileId) {
       status: get('status') || 'pending',
       applicationMethod: get('application-method'),
       thickness: get('application-thickness'),
+      numDips: get('num-dips') ? parseInt(get('num-dips')) : null,
+      dipDuration: get('dip-duration') ? parseInt(get('dip-duration')) : null,
+      firingType: get('firing-type'),
+      coneReached: get('cone-reached'),
       rating: parseInt(get('rating')) || 0,
       photos,
+      preFirePhotos,
       layers,
       notesBefore: getSection('Notes \\(Pre-firing\\)'),
       notesAfter: getSection('Outcome'),
