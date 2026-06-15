@@ -31,6 +31,111 @@ function getInventoryStatus(entry) {
   return 'in-stock'
 }
 
+function TileDetail({ tile, index, accessToken }) {
+  const firingLabel = FIRING_TYPE_LABELS[tile.firingType] || tile.firingType
+  return (
+    <div style={{border: '2px solid #e8e8e8', borderRadius: '12px', overflow: 'hidden', marginBottom: '12px'}}>
+      <div style={{background: '#1a1a1a', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px'}}>
+        <div style={{width: '22px', height: '22px', borderRadius: '50%', background: '#c8a96e', color: '#1a1a1a', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+          {index + 1}
+        </div>
+        <Text variant="bodySm" fontWeight="semibold" tone="textInverse">Tile {index + 1}</Text>
+        <span style={{marginLeft: 'auto', fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '8px',
+          background: tile.status === 'completed' ? '#d4edda' : '#fff3cd',
+          color: tile.status === 'completed' ? '#155724' : '#856404'}}>
+          {tile.status === 'completed' ? 'Complete' : 'Pending'}
+        </span>
+      </div>
+      <div style={{padding: '14px 16px', background: 'white'}}>
+        <div style={{fontSize: '13px', color: '#888', marginBottom: '10px'}}>
+          {[tile.clayBody, tile.applicationMethod, tile.thickness].filter(Boolean).join(' · ')}
+        </div>
+
+        {tile.layers?.length > 0 && (
+          <div style={{marginBottom: '10px'}}>
+            <div style={{fontSize: '11px', fontWeight: 700, color: '#1a3a5c', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px'}}>Layering</div>
+            {tile.layers.map((l, i) => (
+              <div key={i} style={{display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#555', padding: '2px 0'}}>
+                <span style={{width: '16px', height: '16px', borderRadius: '50%', background: '#1a3a5c', color: 'white', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0}}>{i + 1}</span>
+                <span style={{fontWeight: 500}}>{l.type}</span>
+                <span style={{color: '#888'}}>— {l.recipe}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tile.notesBefore && (
+          <div style={{marginBottom: '10px'}}>
+            <div style={{fontSize: '11px', fontWeight: 700, color: '#1a3a5c', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px'}}>Notes Before</div>
+            <p style={{margin: 0, fontSize: '13px', color: '#555'}}>{tile.notesBefore}</p>
+          </div>
+        )}
+
+        {tile.preFirePhotos?.length > 0 && (
+          <div style={{marginBottom: '10px'}}>
+            <div style={{fontSize: '11px', fontWeight: 700, color: '#1a3a5c', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px'}}>Pre-fire Photos</div>
+            <div className="result-photos-grid">
+              {tile.preFirePhotos.map((p, i) => (
+                accessToken && p.fileId ? (
+                  <img key={i} src={`https://www.googleapis.com/drive/v3/files/${p.fileId}?alt=media&access_token=${accessToken}`}
+                    alt={p.name} className="result-photo-img" />
+                ) : null
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tile.status === 'pending' && (
+          <div style={{padding: '8px 0', color: '#888', fontStyle: 'italic', fontSize: '13px'}}>⏳ Awaiting firing</div>
+        )}
+
+        {tile.status === 'completed' && (
+          <>
+            {tile.rating > 0 && (
+              <div className="star-display" style={{marginBottom: '8px'}}>
+                {[1,2,3,4,5].map(n => (
+                  <span key={n} className={`star-icon ${n <= tile.rating ? 'active' : ''}`}>★</span>
+                ))}
+              </div>
+            )}
+            {firingLabel && (
+              <div style={{marginBottom: '8px'}}>
+                <div style={{fontSize: '11px', fontWeight: 700, color: '#1a3a5c', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px'}}>Firing</div>
+                <p style={{margin: 0, fontSize: '13px', color: '#555'}}>{firingLabel}{tile.coneReached ? ` · Cone ${tile.coneReached}` : ''}</p>
+              </div>
+            )}
+            {tile.notesAfter && (
+              <div style={{marginBottom: '8px'}}>
+                <div style={{fontSize: '11px', fontWeight: 700, color: '#1a3a5c', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px'}}>Outcome</div>
+                <p style={{margin: 0, fontSize: '13px', color: '#555'}}>{tile.notesAfter}</p>
+              </div>
+            )}
+            {tile.nextSteps && (
+              <div style={{marginBottom: '8px'}}>
+                <div style={{fontSize: '11px', fontWeight: 700, color: '#1a3a5c', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px'}}>What To Try Next</div>
+                <p style={{margin: 0, fontSize: '13px', color: '#555'}}>{tile.nextSteps}</p>
+              </div>
+            )}
+            {tile.photos?.length > 0 && (
+              <div>
+                <div style={{fontSize: '11px', fontWeight: 700, color: '#1a3a5c', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px'}}>Post-fire Photos</div>
+                <div className="result-photos-grid">
+                  {tile.photos.map((p, i) => (
+                    accessToken && p.fileId ? (
+                      <img key={i} src={`https://www.googleapis.com/drive/v3/files/${p.fileId}?alt=media&access_token=${accessToken}`}
+                        alt={p.name} className="result-photo-img" />
+                    ) : null
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function TestsScreen({
   testResults,
   recipes,
@@ -46,43 +151,29 @@ export default function TestsScreen({
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [editingResult, setEditingResult] = useState(null)
   const [selectedResult, setSelectedResult] = useState(null)
-  const [startingTest, setStartingTest] = useState(null) // glaze inventory entry
+  const [startingTest, setStartingTest] = useState(null)
   const [loadingLayering, setLoadingLayering] = useState(false)
   const [layeringSuggestion, setLayeringSuggestion] = useState('')
 
-  const pendingCount = testResults.filter(r => r.status === 'pending').length
+  const pendingCount = testResults.filter(r => r.status === 'pending' || r.status === 'partial').length
   const completedCount = testResults.filter(r => r.status === 'completed').length
 
-  // Sort inventory most recent first, exclude used-up
   const availableGlazes = [...(glazeInventory || [])]
     .filter(e => !e.isUsedUp)
     .sort((a, b) => new Date(b.dateMixed) - new Date(a.dateMixed))
 
   const filteredTests = [...testResults]
     .filter(r => {
-      if (tab === 'pending') return r.status === 'pending'
+      if (tab === 'pending') return r.status === 'pending' || r.status === 'partial'
       if (tab === 'completed') return r.status === 'completed'
       return false
     })
     .filter(r => {
       if (!search) return true
       const s = search.toLowerCase()
-      return (
-        r.recipeName?.toLowerCase().includes(s) ||
-        r.clayBody?.toLowerCase().includes(s) ||
-        r.notesAfter?.toLowerCase().includes(s) ||
-        r.notesBefore?.toLowerCase().includes(s)
-      )
+      return r.recipeName?.toLowerCase().includes(s)
     })
     .sort((a, b) => new Date(b.date) - new Date(a.date))
-
-  const getRecipe = (result) =>
-    recipes?.find(r => r.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') === result.recipeSlug)
-
-  const truncate = (str, len = 80) => {
-    if (!str) return '—'
-    return str.length > len ? str.slice(0, len) + '…' : str
-  }
 
   const handleAskLayering = async (entry) => {
     setLoadingLayering(true)
@@ -100,12 +191,12 @@ export default function TestsScreen({
 
 Other glazes I have available: ${otherGlazes.join(', ')}
 
-Suggest the best layering combinations and application order for test tiles. Which glazes to pair it with and how to apply them (which goes first, thickness, method). Be concise and practical — I'm about to load the kiln.`
+Suggest the best layering combinations and application order for test tiles. Which glazes to pair it with and how to apply them. Be concise and practical.`
         : `I'm about to fire test tiles with a glaze called "${entry.recipeName}"${recipe?.chemistry?.stull?.zone ? ` (${recipe.chemistry.stull.zone})` : ''}.
 
 Other glazes I have available: ${otherGlazes.join(', ')}
 
-Suggest the best layering combinations and application order for test tiles. Which glazes to pair it with, what order to apply them, and how thick. Be concise and practical — I'm about to load the kiln.`
+Suggest the best layering combinations and application order for test tiles. Which glazes to pair, what order, and how thick. Be concise and practical.`
 
       const response = await fetch('/api/claude', {
         method: 'POST',
@@ -127,12 +218,14 @@ Suggest the best layering combinations and application order for test tiles. Whi
 
   // ── Edit view ──
   if (editingResult) {
-    const recipe = getRecipe(editingResult) || { name: editingResult.recipeName }
+    const recipe = recipes?.find(r =>
+      r.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') === editingResult.recipeSlug
+    ) || { name: editingResult.recipeName }
     return (
-      <Page title="Edit Test" backAction={{ content: 'Tests', onAction: () => setEditingResult(null) }}>
+      <Page title="Edit Test Session" backAction={{ content: 'Tests', onAction: () => setEditingResult(null) }}>
         <TestResultForm
           recipe={recipe}
-          existingResult={editingResult}
+          existingSession={editingResult}
           accessToken={accessToken}
           photosFolderId={photosFolderId}
           clayBodies={clayBodies}
@@ -153,44 +246,17 @@ Suggest the best layering combinations and application order for test tiles. Whi
         backAction={{ content: 'Tests', onAction: () => { setStartingTest(null); setLayeringSuggestion('') } }}
       >
         <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
-
-          {/* Layering suggestion */}
-          <Card>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: layeringSuggestion ? '12px' : '0'}}>
-              <div>
-                <Text variant="headingSm">Layering Suggestions</Text>
-                <Text variant="bodySm" tone="subdued">Ask Sidekick for pairing and application order ideas</Text>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleAskLayering(startingTest)}
-                disabled={loadingLayering}
-                style={{
-                  padding: '8px 14px', background: '#1a1a1a', color: 'white', border: 'none',
-                  borderRadius: '6px', fontSize: '13px', fontWeight: 600,
-                  cursor: loadingLayering ? 'not-allowed' : 'pointer',
-                  opacity: loadingLayering ? 0.7 : 1,
-                  display: 'flex', alignItems: 'center', gap: '6px'
-                }}
-              >
-                {loadingLayering ? <Spinner size="small" /> : '✦'}
-                {loadingLayering ? 'Thinking...' : 'Ask Sidekick'}
-              </button>
-            </div>
-            {layeringSuggestion && (
-              <div style={{padding: '12px', background: '#f9f7f4', borderRadius: '8px', fontSize: '14px', color: '#333', lineHeight: 1.6, whiteSpace: 'pre-wrap'}}>
-                {layeringSuggestion}
-              </div>
-            )}
-          </Card>
-
-          {/* Test form */}
           <TestResultForm
             recipe={recipe}
             accessToken={accessToken}
             photosFolderId={photosFolderId}
             clayBodies={clayBodies}
+            layeringSuggestion={layeringSuggestion}
+            onAskLayering={() => handleAskLayering(startingTest)}
+            loadingLayering={loadingLayering}
             onSave={(result) => {
+              result.inventoryId = startingTest.id
+              result.inventoryName = startingTest.recipeName
               onSaveTestResult(result)
               setStartingTest(null)
               setLayeringSuggestion('')
@@ -205,13 +271,14 @@ Suggest the best layering combinations and application order for test tiles. Whi
 
   // ── Detail view ──
   if (selectedResult) {
-    const firingLabel = FIRING_TYPE_LABELS[selectedResult.firingType] || selectedResult.firingType
+    const allComplete = selectedResult.tiles?.every(t => t.status === 'completed')
+    const pendingTiles = selectedResult.tiles?.filter(t => t.status === 'pending').length || 0
     return (
       <Page title={selectedResult.recipeName} backAction={{ content: 'Tests', onAction: () => setSelectedResult(null) }}>
         <div className="recipe-detail">
           <div className="detail-title-block">
             <div className="detail-type-row">
-              <div className="detail-type">Test · {selectedResult.date}</div>
+              <div className="detail-type">Test Session · {selectedResult.date}</div>
               <div style={{display: 'flex', gap: '8px'}}>
                 <button className="detail-mix-btn" style={{background: '#1a3a5c'}}
                   onClick={() => { setEditingResult(selectedResult); setSelectedResult(null) }}>
@@ -225,115 +292,30 @@ Suggest the best layering combinations and application order for test tiles. Whi
             </div>
             <h1 className="detail-name">{selectedResult.recipeName}</h1>
             <div className="detail-meta">
-              {[selectedResult.clayBody, selectedResult.applicationMethod, selectedResult.thickness].filter(Boolean).join(' · ')}
+              {selectedResult.tiles?.length || 0} tile{selectedResult.tiles?.length !== 1 ? 's' : ''}
+              {pendingTiles > 0 ? ` · ${pendingTiles} pending` : ' · all complete'}
             </div>
           </div>
 
-          {selectedResult.status === 'completed' && selectedResult.rating > 0 && (
-            <div className="detail-section">
-              <div className="star-display">
-                {[1,2,3,4,5].map(n => (
-                  <span key={n} className={`star-icon ${n <= selectedResult.rating ? 'active' : ''}`}>★</span>
-                ))}
+          <div style={{padding: '12px 16px'}}>
+            {selectedResult.tiles?.map((tile, i) => (
+              <TileDetail key={tile.id} tile={tile} index={i} accessToken={accessToken} />
+            ))}
+            {selectedResult.notes && (
+              <div style={{background: 'white', borderRadius: '8px', padding: '14px 16px', marginTop: '4px', border: '1px solid #e8e8e8'}}>
+                <div style={{fontSize: '11px', fontWeight: 700, color: '#1a3a5c', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px'}}>Session Notes</div>
+                <p style={{margin: 0, fontSize: '14px', color: '#555'}}>{selectedResult.notes}</p>
               </div>
-            </div>
-          )}
-
-          {selectedResult.layers?.length > 0 && (
-            <div className="detail-section">
-              <h2 className="section-title">Layering</h2>
-              {selectedResult.layers.map((l, i) => (
-                <div key={i} className="result-layer-row">
-                  <div className="result-layer-num">{i + 1}</div>
-                  <div>
-                    <div className="result-layer-type">{l.type}</div>
-                    <div className="result-layer-recipe">{l.recipe || '—'}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {selectedResult.notesBefore && (
-            <div className="detail-section">
-              <h2 className="section-title">Notes Before Firing</h2>
-              <p className="detail-notes">{selectedResult.notesBefore}</p>
-            </div>
-          )}
-
-          {selectedResult.preFirePhotos?.length > 0 && (
-            <div className="detail-section">
-              <h2 className="section-title">Pre-fire Photos</h2>
-              <div className="result-photos-grid">
-                {selectedResult.preFirePhotos.map((p, i) => (
-                  accessToken && p.fileId ? (
-                    <img key={i}
-                      src={`https://www.googleapis.com/drive/v3/files/${p.fileId}?alt=media&access_token=${accessToken}`}
-                      alt={p.name} className="result-photo-img" />
-                  ) : null
-                ))}
-              </div>
-            </div>
-          )}
-
-          {selectedResult.status === 'pending' && (
-            <div className="detail-section">
-              <div className="pending-badge">⏳ Awaiting firing</div>
-              <div style={{marginTop: '12px'}}>
-                <button onClick={() => { setEditingResult(selectedResult); setSelectedResult(null) }}
-                  style={{padding: '9px 18px', background: '#1a7a1a', color: 'white', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: 600, cursor: 'pointer'}}>
-                  Add Post-fire Results
-                </button>
-              </div>
-            </div>
-          )}
-
-          {selectedResult.status === 'completed' && (
-            <>
-              {selectedResult.firingType && (
-                <div className="detail-section">
-                  <h2 className="section-title">Firing</h2>
-                  <p className="detail-notes">
-                    {firingLabel}{selectedResult.coneReached ? ` · Cone ${selectedResult.coneReached}` : ''}
-                  </p>
-                </div>
-              )}
-              {selectedResult.notesAfter && (
-                <div className="detail-section">
-                  <h2 className="section-title">Outcome</h2>
-                  <p className="detail-notes">{selectedResult.notesAfter}</p>
-                </div>
-              )}
-              {selectedResult.nextSteps && (
-                <div className="detail-section">
-                  <h2 className="section-title">What To Try Next</h2>
-                  <p className="detail-notes">{selectedResult.nextSteps}</p>
-                </div>
-              )}
-              {selectedResult.photos?.length > 0 && (
-                <div className="detail-section">
-                  <h2 className="section-title">Post-fire Photos</h2>
-                  <div className="result-photos-grid">
-                    {selectedResult.photos.map((p, i) => (
-                      accessToken && p.fileId ? (
-                        <img key={i}
-                          src={`https://www.googleapis.com/drive/v3/files/${p.fileId}?alt=media&access_token=${accessToken}`}
-                          alt={p.name} className="result-photo-img" />
-                      ) : null
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+            )}
+          </div>
         </div>
 
-        <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete test?"
+        <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete test session?"
           primaryAction={{ content: 'Delete', destructive: true, onAction: () => {
             onDeleteTestResult(deleteTarget); setDeleteTarget(null); setSelectedResult(null)
           }}}
           secondaryActions={[{ content: 'Cancel', onAction: () => setDeleteTarget(null) }]}>
-          <Modal.Section><Text>This test result will be permanently deleted.</Text></Modal.Section>
+          <Modal.Section><Text>This test session will be permanently deleted.</Text></Modal.Section>
         </Modal>
       </Page>
     )
@@ -356,13 +338,12 @@ Suggest the best layering combinations and application order for test tiles. Whi
           </button>
         </div>
 
-        {/* ── Start a Test tab ── */}
         {tab === 'start' && (
           <>
             {availableGlazes.length === 0 ? (
               <Card>
                 <div style={{padding: '32px', textAlign: 'center'}}>
-                  <Text tone="subdued">No glazes in inventory yet. Mix a batch or add a commercial glaze first.</Text>
+                  <Text tone="subdued">No glazes in inventory. Mix a batch or add a commercial glaze first.</Text>
                 </div>
               </Card>
             ) : (
@@ -371,22 +352,12 @@ Suggest the best layering combinations and application order for test tiles. Whi
                   const isCommercial = entry.entryType === 'commercial'
                   const status = getInventoryStatus(entry)
                   return (
-                    <div
-                      key={entry.id}
-                      onClick={() => { setStartingTest(entry); setLayeringSuggestion('') }}
-                      style={{
-                        background: 'white', borderRadius: '12px', padding: '16px',
-                        border: '1px solid #e8e8e8', cursor: 'pointer',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                        transition: 'box-shadow 0.15s',
-                      }}
-                    >
+                    <div key={entry.id} onClick={() => { setStartingTest(entry); setLayeringSuggestion('') }}
+                      style={{background: 'white', borderRadius: '12px', padding: '16px', border: '1px solid #e8e8e8', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)'}}>
                       <div style={{fontSize: '11px', color: '#2d6a9f', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600, marginBottom: '4px'}}>
                         {isCommercial ? `Commercial${entry.brand ? ` · ${entry.brand}` : ''}` : `Mixed · ${entry.dateMixed}`}
                       </div>
-                      <div style={{fontSize: '16px', fontWeight: 700, color: '#1a1a1a', marginBottom: '4px'}}>
-                        {entry.recipeName}
-                      </div>
+                      <div style={{fontSize: '16px', fontWeight: 700, color: '#1a1a1a', marginBottom: '4px'}}>{entry.recipeName}</div>
                       <div style={{fontSize: '13px', color: '#888', marginBottom: '12px'}}>
                         {isCommercial
                           ? [entry.colour, entry.coneRange ? `Cone ${entry.coneRange}` : ''].filter(Boolean).join(' · ')
@@ -394,16 +365,12 @@ Suggest the best layering combinations and application order for test tiles. Whi
                         }
                       </div>
                       <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '10px', borderTop: '1px solid #f0f0f0'}}>
-                        <span style={{
-                          fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '10px', textTransform: 'uppercase', letterSpacing: '0.3px',
+                        <span style={{fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '10px', textTransform: 'uppercase', letterSpacing: '0.3px',
                           background: status === 'low' ? '#fff8e1' : '#d4edda',
-                          color: status === 'low' ? '#aa7700' : '#155724',
-                        }}>
+                          color: status === 'low' ? '#aa7700' : '#155724'}}>
                           {STATUS_LABELS[status]}
                         </span>
-                        <span style={{fontSize: '13px', color: '#1a3a5c', fontWeight: 600}}>
-                          Test this glaze →
-                        </span>
+                        <span style={{fontSize: '13px', color: '#1a3a5c', fontWeight: 600}}>Test this glaze →</span>
                       </div>
                     </div>
                   )
@@ -413,11 +380,10 @@ Suggest the best layering combinations and application order for test tiles. Whi
           </>
         )}
 
-        {/* ── Pending / Completed tabs ── */}
         {(tab === 'pending' || tab === 'completed') && (
           <>
             <Card>
-              <TextField label="Search" labelHidden placeholder="Search by recipe, clay body, or notes..."
+              <TextField label="Search" labelHidden placeholder="Search by recipe name..."
                 value={search} onChange={setSearch} autoComplete="off"
                 clearButton onClearButtonClick={() => setSearch('')} />
             </Card>
@@ -435,7 +401,9 @@ Suggest the best layering combinations and application order for test tiles. Whi
             ) : (
               <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                 {filteredTests.map(result => {
-                  const firingLabel = FIRING_TYPE_LABELS[result.firingType] || result.firingType
+                  const completedTiles = result.tiles?.filter(t => t.status === 'completed').length || 0
+                  const totalTiles = result.tiles?.length || 0
+                  const bestRating = result.tiles?.reduce((max, t) => Math.max(max, t.rating || 0), 0) || 0
                   return (
                     <div key={result.id} className="recipe-card" onClick={() => setSelectedResult(result)} style={{cursor: 'pointer'}}>
                       <div className="recipe-card-top">
@@ -443,18 +411,14 @@ Suggest the best layering combinations and application order for test tiles. Whi
                           <div className="recipe-card-type">{result.date}</div>
                           <div className="recipe-card-name">{result.recipeName}</div>
                           <div className="recipe-card-meta">
-                            {[result.clayBody, result.applicationMethod].filter(Boolean).join(' · ')}
+                            {totalTiles} tile{totalTiles !== 1 ? 's' : ''}
+                            {tab === 'pending' ? ` · ${completedTiles}/${totalTiles} complete` : ''}
                           </div>
-                          {result.status === 'completed' && firingLabel && (
-                            <div className="recipe-card-meta" style={{marginTop: '2px', color: '#1a3a5c'}}>
-                              {firingLabel}{result.coneReached ? ` · Cone ${result.coneReached}` : ''}
-                            </div>
-                          )}
                         </div>
                         <div className="recipe-card-right">
-                          {result.status === 'completed' && result.rating > 0 && (
+                          {bestRating > 0 && (
                             <div style={{fontSize: '13px', color: '#f0a500'}}>
-                              {'★'.repeat(result.rating)}{'☆'.repeat(5 - result.rating)}
+                              {'★'.repeat(bestRating)}{'☆'.repeat(5 - bestRating)}
                             </div>
                           )}
                           <div onClick={e => e.stopPropagation()}>
@@ -467,11 +431,6 @@ Suggest the best layering combinations and application order for test tiles. Whi
                           </div>
                         </div>
                       </div>
-                      {(result.notesAfter || result.notesBefore) && (
-                        <div className="recipe-card-chem">
-                          {truncate(result.notesAfter || result.notesBefore)}
-                        </div>
-                      )}
                     </div>
                   )
                 })}
@@ -482,12 +441,12 @@ Suggest the best layering combinations and application order for test tiles. Whi
 
       </div>
 
-      <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete test?"
+      <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete test session?"
         primaryAction={{ content: 'Delete', destructive: true, onAction: () => {
           onDeleteTestResult(deleteTarget); setDeleteTarget(null)
         }}}
         secondaryActions={[{ content: 'Cancel', onAction: () => setDeleteTarget(null) }]}>
-        <Modal.Section><Text>This test result will be permanently deleted.</Text></Modal.Section>
+        <Modal.Section><Text>This test session will be permanently deleted.</Text></Modal.Section>
       </Modal>
     </Page>
   )

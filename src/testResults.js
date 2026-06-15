@@ -1,54 +1,21 @@
-export function testResultToMarkdown(result) {
-  const layers = (result.layers || [])
-    .map((l, i) => `${i + 1}. ${l.type} — ${l.recipe || ''}`)
-    .join('\n')
-
-  const photosJson = JSON.stringify(result.photos || [])
-  const preFirePhotosJson = JSON.stringify(result.preFirePhotos || [])
+export function testResultToMarkdown(session) {
+  const tilesJson = JSON.stringify(session.tiles || [])
 
   return `---
-type: test-result
-id: ${result.id}
-recipe: ${result.recipeSlug}
-recipe-name: ${result.recipeName}
-mixing-session: ${result.mixingSessionId || 'none'}
-clay-body: ${result.clayBody || ''}
-date: ${result.date}
-status: ${result.status}
-application-method: ${result.applicationMethod || ''}
-application-thickness: ${result.thickness || ''}
-num-dips: ${result.numDips || ''}
-dip-duration: ${result.dipDuration || ''}
-firing-type: ${result.firingType || ''}
-cone-reached: ${result.coneReached || ''}
-rating: ${result.rating || 0}
-photos: '${photosJson}'
-pre-fire-photos: '${preFirePhotosJson}'
-created: ${result.date}
+type: test-session
+id: ${session.id}
+recipe: ${session.recipeSlug || ''}
+recipe-name: ${session.recipeName || ''}
+inventory-id: ${session.inventoryId || ''}
+inventory-name: ${session.inventoryName || ''}
+date: ${session.date}
 modified: ${new Date().toISOString().split('T')[0]}
+tiles: '${tilesJson}'
 ---
 
-## Layering Order
+## Notes
 
-${layers || 'Not recorded'}
-
-## Notes (Pre-firing)
-
-${result.notesBefore || ''}
-
-## Outcome
-
-${result.notesAfter || ''}
-
-## What To Try Next
-
-${result.nextSteps || ''}
-
-## AI Diagnosis
-
-${result.aiDiagnosis || ''}
-
-[[Recipes/${result.recipeSlug}]]
+${session.notes || ''}
 `
 }
 
@@ -63,62 +30,57 @@ export function markdownToTestResult(content, fileId) {
       return m ? m[1].trim() : ''
     }
 
-    const getSection = (heading) => {
-      const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      const m = content.match(new RegExp(`## ${escaped}\\n\\n([\\s\\S]*?)(?:\\n##|$)`))
-      return m ? m[1].trim() : ''
-    }
-
-    let photos = []
+    let tiles = []
     try {
-      const photosRaw = get('photos').replace(/^'|'$/g, '')
-      photos = JSON.parse(photosRaw)
+      const tilesRaw = get('tiles').replace(/^'|'$/g, '')
+      tiles = JSON.parse(tilesRaw)
     } catch {
-      photos = []
+      tiles = []
     }
 
-    let preFirePhotos = []
-    try {
-      const preRaw = get('pre-fire-photos').replace(/^'|'$/g, '')
-      preFirePhotos = JSON.parse(preRaw)
-    } catch {
-      preFirePhotos = []
-    }
+    const notesMatch = content.match(/## Notes\n\n([\s\S]*?)(?:\n##|$)/)
+    const notes = notesMatch ? notesMatch[1].trim() : ''
 
-    const layersText = getSection('Layering Order')
-    const layers = layersText && layersText !== 'Not recorded'
-      ? layersText.split('\n').map(l => {
-          const m = l.match(/^\d+\.\s+(.+?)\s+—\s+(.*)$/)
-          return m ? { type: m[1].trim(), recipe: m[2].trim() } : null
-        }).filter(Boolean)
-      : []
+    // Derive session-level status from tiles
+    const allComplete = tiles.length > 0 && tiles.every(t => t.status === 'completed')
+    const anyComplete = tiles.some(t => t.status === 'completed')
+    const status = allComplete ? 'completed' : anyComplete ? 'partial' : 'pending'
 
     return {
       fileId,
       id: get('id') || fileId,
       recipeSlug: get('recipe'),
       recipeName: get('recipe-name'),
-      mixingSessionId: get('mixing-session'),
-      clayBody: get('clay-body'),
+      inventoryId: get('inventory-id'),
+      inventoryName: get('inventory-name'),
       date: get('date'),
-      status: get('status') || 'pending',
-      applicationMethod: get('application-method'),
-      thickness: get('application-thickness'),
-      numDips: get('num-dips') ? parseInt(get('num-dips')) : null,
-      dipDuration: get('dip-duration') ? parseInt(get('dip-duration')) : null,
-      firingType: get('firing-type'),
-      coneReached: get('cone-reached'),
-      rating: parseInt(get('rating')) || 0,
-      photos,
-      preFirePhotos,
-      layers,
-      notesBefore: getSection('Notes \\(Pre-firing\\)'),
-      notesAfter: getSection('Outcome'),
-      nextSteps: getSection('What To Try Next'),
-      aiDiagnosis: getSection('AI Diagnosis'),
+      status,
+      tiles,
+      notes,
     }
   } catch (e) {
-    console.error('Failed to parse test result:', e)
+    console.error('Failed to parse test session:', e)
     return null
+  }
+}
+
+export function newTile(recipeName) {
+  return {
+    id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
+    status: 'pending',
+    clayBody: '',
+    applicationMethod: 'dipping',
+    thickness: 'medium',
+    numDips: null,
+    dipDuration: null,
+    layers: [{ type: 'Base Glaze', recipe: recipeName || '' }],
+    notesBefore: '',
+    preFirePhotos: [],
+    firingType: '',
+    coneReached: '',
+    rating: 0,
+    notesAfter: '',
+    nextSteps: '',
+    photos: [],
   }
 }
