@@ -429,7 +429,7 @@ function App() {
   const handleSaveGlazeInventoryEntry = async (entry) => {
     if (!accessToken || !vaultFolders) return
     try {
-      const filename = `${entry.recipeSlug}-${entry.id}.md`
+      const filename = `${entry.recipeSlug || entry.id}-${entry.id}.md`
       const content = glazeInventoryToMarkdown(entry)
       if (entry.fileId) {
         await updateFile(accessToken, entry.fileId, content)
@@ -493,6 +493,7 @@ function App() {
 
     const inventoryEntry = {
       id: sessionData.id || Date.now().toString(),
+      entryType: 'mixed',
       recipeId: recipe.id,
       recipeSlug: recipe.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       recipeName: recipe.name,
@@ -721,6 +722,7 @@ function App() {
           testResults={testResults}
           recipes={recipes}
           clayBodies={clayBodies}
+          glazeInventory={glazeInventory}
           onSaveTestResult={handleSaveTestResult}
           onDeleteTestResult={handleDeleteTestResult}
           accessToken={accessToken}
