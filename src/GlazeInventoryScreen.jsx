@@ -570,8 +570,8 @@ export default function GlazeInventoryScreen({
                     }}>
                       {STATUS_LABELS[status]}
                     </span>
-                    {!isCommercial && entry.sg && !isNaN(Number(entry.sg)) && (
-                      <span style={{fontSize: '12px', color: '#888'}}>SG {entry.sg}</span>
+                    {!isCommercial && Number(entry.sg) > 0 && (
+                      <span style={{fontSize: '12px', color: '#888'}}>SG {Number(entry.sg).toFixed(2)}</span>
                     )}
                   </div>
                 </div>
