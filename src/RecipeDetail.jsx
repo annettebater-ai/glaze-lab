@@ -22,6 +22,17 @@ const FOOD_SAFETY_COLORS = {
   unknown: '#888'
 }
 
+const FIRING_TYPE_LABELS = {
+  'cone-6-ox': 'Cone 6 Ox',
+  'cone-10-red': 'Cone 10 Red',
+  'cone-04-ox': 'Cone 04 Ox',
+  'wood': 'Wood Fire',
+  'soda': 'Soda Fire',
+  'salt': 'Salt Fire',
+  'raku': 'Raku',
+  'other': 'Other',
+}
+
 const StarDisplay = ({ value }) => (
   <div className="star-display">
     {[1,2,3,4,5].map(n => (
@@ -49,21 +60,29 @@ function CompatibilityWarnings({ recipe, clayBodies, testResults }) {
       allWarnings.push({ ...w, clayBody: cb.name, source: 'chemistry' })
     })
     const recipeSlug = recipe.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-    const relevantResults = (testResults || []).filter(r =>
-      r.recipeSlug === recipeSlug &&
-      r.clayBody?.toLowerCase() === cb.name.toLowerCase() &&
-      r.status === 'completed' &&
-      r.rating > 0 &&
-      r.rating <= 2
-    )
+    const relevantResults = (testResults || []).filter(r => {
+      const tiles = r.tiles || []
+      const hasLowRating = tiles.some(t =>
+        t.clayBody?.toLowerCase() === cb.name.toLowerCase() &&
+        t.status === 'completed' &&
+        t.rating > 0 &&
+        t.rating <= 2
+      )
+      return r.recipeSlug === recipeSlug && hasLowRating
+    })
     relevantResults.forEach(result => {
-      allWarnings.push({
-        type: 'experience',
-        severity: result.rating === 1 ? 'high' : 'medium',
-        clayBody: cb.name,
-        source: 'rating',
-        message: `Rated ${result.rating}★ on ${cb.name} (${result.date}).${result.notesAfter ? ` Note: ${result.notesAfter}` : ''}`
-      })
+      const badTile = result.tiles?.find(t =>
+        t.clayBody?.toLowerCase() === cb.name.toLowerCase() && t.rating <= 2
+      )
+      if (badTile) {
+        allWarnings.push({
+          type: 'experience',
+          severity: badTile.rating === 1 ? 'high' : 'medium',
+          clayBody: cb.name,
+          source: 'rating',
+          message: `Rated ${badTile.rating}★ on ${cb.name} (${result.date}).${badTile.notesAfter ? ` Note: ${badTile.notesAfter}` : ''}`
+        })
+      }
     })
   })
 
@@ -114,33 +133,122 @@ function InlineNameEditor({ name, onSave }) {
   if (editing) {
     return (
       <div className="inline-name-editor">
-        <input
-          ref={inputRef}
-          className="inline-name-input"
-          value={value}
+        <input ref={inputRef} className="inline-name-input" value={value}
           onChange={e => setValue(e.target.value)}
-          onBlur={handleSave}
-          onKeyDown={handleKeyDown}
-        />
-        <button
-          type="button"
-          className="inline-name-save"
-          onMouseDown={e => e.preventDefault()}
-          onClick={handleSave}
-        >✓</button>
+          onBlur={handleSave} onKeyDown={handleKeyDown} />
+        <button type="button" className="inline-name-save"
+          onMouseDown={e => e.preventDefault()} onClick={handleSave}>✓</button>
       </div>
     )
   }
 
   return (
-    <h1
-      className="detail-name editable"
-      onClick={() => setEditing(true)}
-      title="Click to edit name"
-    >
+    <h1 className="detail-name editable" onClick={() => setEditing(true)} title="Click to edit name">
       {name}
       <span className="edit-pencil">✎</span>
     </h1>
+  )
+}
+
+function TileDetail({ tile, index, accessToken }) {
+  const firingLabel = FIRING_TYPE_LABELS[tile.firingType] || tile.firingType
+  return (
+    <div style={{border: '1px solid #e8e8e8', borderRadius: '8px', overflow: 'hidden', marginBottom: '10px'}}>
+      <div style={{background: '#1a1a1a', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px'}}>
+        <div style={{width: '20px', height: '20px', borderRadius: '50%', background: '#c8a96e', color: '#1a1a1a', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+          {index + 1}
+        </div>
+        <span style={{fontSize: '12px', fontWeight: 600, color: 'white'}}>Tile {index + 1}</span>
+        <span style={{marginLeft: 'auto', fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '8px',
+          background: tile.status === 'completed' ? '#d4edda' : '#fff3cd',
+          color: tile.status === 'completed' ? '#155724' : '#856404'}}>
+          {tile.status === 'completed' ? 'Complete' : 'Pending'}
+        </span>
+      </div>
+      <div style={{padding: '12px', background: 'white'}}>
+        {[tile.clayBody, tile.applicationMethod, tile.thickness].filter(Boolean).length > 0 && (
+          <div style={{fontSize: '12px', color: '#888', marginBottom: '8px'}}>
+            {[tile.clayBody, tile.applicationMethod, tile.thickness].filter(Boolean).join(' · ')}
+          </div>
+        )}
+
+        {tile.layers?.length > 0 && (
+          <div style={{marginBottom: '8px'}}>
+            <div style={{fontSize: '10px', fontWeight: 700, color: '#1a3a5c', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px'}}>Layering</div>
+            {tile.layers.map((l, i) => (
+              <div key={i} style={{display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#555', padding: '1px 0'}}>
+                <span style={{width: '14px', height: '14px', borderRadius: '50%', background: '#1a3a5c', color: 'white', fontSize: '9px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0}}>{i + 1}</span>
+                <span style={{fontWeight: 500}}>{l.type}</span>
+                <span style={{color: '#aaa'}}>—</span>
+                <span>{l.recipe}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tile.notesBefore && (
+          <div style={{marginBottom: '8px'}}>
+            <div style={{fontSize: '10px', fontWeight: 700, color: '#1a3a5c', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '3px'}}>Before</div>
+            <p style={{margin: 0, fontSize: '12px', color: '#555'}}>{tile.notesBefore}</p>
+          </div>
+        )}
+
+        {tile.preFirePhotos?.length > 0 && (
+          <div style={{marginBottom: '8px'}}>
+            <div style={{fontSize: '10px', fontWeight: 700, color: '#1a3a5c', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px'}}>Pre-fire</div>
+            <div className="result-photos-grid">
+              {tile.preFirePhotos.map((p, i) => (
+                accessToken && p.fileId ? (
+                  <img key={i} src={`https://www.googleapis.com/drive/v3/files/${p.fileId}?alt=media&access_token=${accessToken}`}
+                    alt={p.name} className="result-photo-img" />
+                ) : null
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tile.status === 'pending' && (
+          <div style={{color: '#888', fontStyle: 'italic', fontSize: '12px'}}>⏳ Awaiting firing</div>
+        )}
+
+        {tile.status === 'completed' && (
+          <>
+            {tile.rating > 0 && <StarDisplay value={tile.rating} />}
+            {firingLabel && (
+              <div style={{marginTop: '6px', marginBottom: '6px'}}>
+                <div style={{fontSize: '10px', fontWeight: 700, color: '#1a3a5c', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '3px'}}>Firing</div>
+                <p style={{margin: 0, fontSize: '12px', color: '#555'}}>{firingLabel}{tile.coneReached ? ` · Cone ${tile.coneReached}` : ''}</p>
+              </div>
+            )}
+            {tile.notesAfter && (
+              <div style={{marginBottom: '6px'}}>
+                <div style={{fontSize: '10px', fontWeight: 700, color: '#1a3a5c', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '3px'}}>Outcome</div>
+                <p style={{margin: 0, fontSize: '12px', color: '#555'}}>{tile.notesAfter}</p>
+              </div>
+            )}
+            {tile.nextSteps && (
+              <div style={{marginBottom: '6px'}}>
+                <div style={{fontSize: '10px', fontWeight: 700, color: '#1a3a5c', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '3px'}}>Next Steps</div>
+                <p style={{margin: 0, fontSize: '12px', color: '#555'}}>{tile.nextSteps}</p>
+              </div>
+            )}
+            {tile.photos?.length > 0 && (
+              <div>
+                <div style={{fontSize: '10px', fontWeight: 700, color: '#1a3a5c', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px'}}>Post-fire</div>
+                <div className="result-photos-grid">
+                  {tile.photos.map((p, i) => (
+                    accessToken && p.fileId ? (
+                      <img key={i} src={`https://www.googleapis.com/drive/v3/files/${p.fileId}?alt=media&access_token=${accessToken}`}
+                        alt={p.name} className="result-photo-img" />
+                    ) : null
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -171,22 +279,17 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onS
     if (onSaveRecipe) onSaveRecipe({ ...recipe, name: newName })
   }
 
+  // ── New/Edit test session form ──
   if (showTestForm || editingResult) {
     return (
       <div className="recipe-detail">
         <div className="detail-title-block">
           <div className="detail-type-row">
             <div className="detail-type">
-              {editingResult ? 'Edit Test Result' : 'New Test Result'}
+              {editingResult ? 'Edit Test Session' : 'New Test Session'}
             </div>
-            <button
-              className="detail-mix-btn"
-              style={{background: '#888'}}
-              onClick={() => {
-                setShowTestForm(false)
-                setEditingResult(null)
-              }}
-            >
+            <button className="detail-mix-btn" style={{background: '#888'}}
+              onClick={() => { setShowTestForm(false); setEditingResult(null) }}>
               Cancel
             </button>
           </div>
@@ -194,19 +297,16 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onS
         </div>
         <TestResultForm
           recipe={recipe}
-          mixingSessions={mixingSessions}
-          existingResult={editingResult || null}
+          existingSession={editingResult || null}
           accessToken={accessToken}
           photosFolderId={photosFolderId}
+          clayBodies={clayBodies}
           onSave={(result) => {
             onSaveTestResult(result)
             setShowTestForm(false)
             setEditingResult(null)
           }}
-          onCancel={() => {
-            setShowTestForm(false)
-            setEditingResult(null)
-          }}
+          onCancel={() => { setShowTestForm(false); setEditingResult(null) }}
           onDelete={editingResult ? (result) => {
             onDeleteTestResult(result)
             setEditingResult(null)
@@ -216,109 +316,56 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onS
     )
   }
 
+  // ── Session detail view ──
   if (selectedResult) {
+    const totalTiles = selectedResult.tiles?.length || 0
+    const completedTiles = selectedResult.tiles?.filter(t => t.status === 'completed').length || 0
+    const bestRating = selectedResult.tiles?.reduce((max, t) => Math.max(max, t.rating || 0), 0) || 0
+
     return (
       <div className="recipe-detail">
         <div className="detail-title-block">
           <div className="detail-type-row">
-            <div className="detail-type">Test Result · {selectedResult.date}</div>
+            <div className="detail-type">Test Session · {selectedResult.date}</div>
             <div style={{display: 'flex', gap: '8px'}}>
-              <button
-                className="detail-mix-btn"
-                style={{background: '#1a3a5c'}}
-                onClick={() => {
-                  setEditingResult(selectedResult)
-                  setSelectedResult(null)
-                }}
-              >
+              <button className="detail-mix-btn" style={{background: '#1a3a5c'}}
+                onClick={() => { setEditingResult(selectedResult); setSelectedResult(null) }}>
                 Edit
               </button>
-              <button
-                className="detail-mix-btn"
-                style={{background: '#888'}}
-                onClick={() => setSelectedResult(null)}
-              >
+              <button className="detail-mix-btn" style={{background: '#888'}}
+                onClick={() => setSelectedResult(null)}>
                 ← Back
               </button>
             </div>
           </div>
           <h1 className="detail-name">{recipe.name}</h1>
           <div className="detail-meta">
-            {selectedResult.clayBody} · {selectedResult.applicationMethod} · {selectedResult.thickness}
+            {totalTiles} tile{totalTiles !== 1 ? 's' : ''} · {completedTiles}/{totalTiles} complete
           </div>
         </div>
 
-        {selectedResult.status === 'completed' && selectedResult.rating > 0 && (
+        {bestRating > 0 && (
           <div className="detail-section">
-            <StarDisplay value={selectedResult.rating} />
+            <StarDisplay value={bestRating} />
           </div>
         )}
 
-        {selectedResult.photos && selectedResult.photos.length > 0 && (
-          <div className="detail-section">
-            <h2 className="section-title">Photos</h2>
-            <div className="result-photos-grid">
-              {selectedResult.photos.map((p, i) => (
-                <DriveImage
-                  key={i}
-                  fileId={p.fileId || p}
-                  accessToken={accessToken}
-                  alt="Test result"
-                  className="result-photo-img"
-                />
-              ))}
+        <div style={{padding: '0 16px'}}>
+          {selectedResult.tiles?.map((tile, i) => (
+            <TileDetail key={tile.id || i} tile={tile} index={i} accessToken={accessToken} />
+          ))}
+          {selectedResult.notes && (
+            <div style={{padding: '12px', background: '#f9f7f4', borderRadius: '8px', marginTop: '4px'}}>
+              <div style={{fontSize: '10px', fontWeight: 700, color: '#1a3a5c', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px'}}>Session Notes</div>
+              <p style={{margin: 0, fontSize: '13px', color: '#555'}}>{selectedResult.notes}</p>
             </div>
-          </div>
-        )}
-
-        {selectedResult.layers && selectedResult.layers.length > 0 && (
-          <div className="detail-section">
-            <h2 className="section-title">Layering</h2>
-            {selectedResult.layers.map((l, i) => (
-              <div key={i} className="result-layer-row">
-                <div className="result-layer-num">{i + 1}</div>
-                <div>
-                  <div className="result-layer-type">{l.type}</div>
-                  <div className="result-layer-recipe">{l.recipe || '—'}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {selectedResult.notesBefore && (
-          <div className="detail-section">
-            <h2 className="section-title">Notes Before Firing</h2>
-            <p className="detail-notes">{selectedResult.notesBefore}</p>
-          </div>
-        )}
-
-        {selectedResult.status === 'pending' && (
-          <div className="detail-section">
-            <div className="pending-badge">⏳ Awaiting firing</div>
-          </div>
-        )}
-
-        {selectedResult.status === 'completed' && (
-          <>
-            {selectedResult.notesAfter && (
-              <div className="detail-section">
-                <h2 className="section-title">Outcome</h2>
-                <p className="detail-notes">{selectedResult.notesAfter}</p>
-              </div>
-            )}
-            {selectedResult.nextSteps && (
-              <div className="detail-section">
-                <h2 className="section-title">What To Try Next</h2>
-                <p className="detail-notes">{selectedResult.nextSteps}</p>
-              </div>
-            )}
-          </>
-        )}
+          )}
+        </div>
       </div>
     )
   }
 
+  // ── Main recipe detail view ──
   return (
     <div className="recipe-detail">
 
@@ -327,18 +374,12 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onS
           <div className="detail-type">{recipe.recipeType}</div>
           <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
             {onEditRecipe && (
-              <button
-                className="detail-mix-btn"
-                style={{background: '#555'}}
-                onClick={() => onEditRecipe(recipe)}
-              >
+              <button className="detail-mix-btn" style={{background: '#555'}}
+                onClick={() => onEditRecipe(recipe)}>
                 Edit
               </button>
             )}
-            <button
-              className="detail-mix-btn"
-              onClick={() => onStartMix(recipe)}
-            >
+            <button className="detail-mix-btn" onClick={() => onStartMix(recipe)}>
               Start Mixing
             </button>
           </div>
@@ -350,55 +391,53 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onS
         </div>
       </div>
 
-      <CompatibilityWarnings
-        recipe={recipe}
-        clayBodies={clayBodies}
-        testResults={testResults}
-      />
+      <CompatibilityWarnings recipe={recipe} clayBodies={clayBodies} testResults={testResults} />
 
       <div className="detail-section">
         <div className="section-header-row">
-          <h2 className="section-title" style={{marginBottom: 0}}>Test Results</h2>
+          <h2 className="section-title" style={{marginBottom: 0}}>Test Sessions</h2>
           <button className="add-result-btn" onClick={() => setShowTestForm(true)}>
-            + Add Result
+            + Add Test
           </button>
         </div>
         {recipeResults.length === 0 ? (
           <div className="no-results-hint">
-            No test results yet. Fire a test tile and record the outcome.
+            No test sessions yet. Add a test to record your tile results.
           </div>
         ) : (
           <div className="results-carousel">
-            {recipeResults.map((result, i) => (
-              <button
-                key={i}
-                className={`result-tile ${result.status}`}
-                onClick={() => setSelectedResult(result)}
-              >
-                {result.status === 'pending' ? (
-                  <div className="result-tile-pending">
-                    <div className="result-tile-icon">⏳</div>
-                    <div className="result-tile-date">{result.date}</div>
-                    <div className="result-tile-label">Pending</div>
-                  </div>
-                ) : (
-                  <div className="result-tile-completed">
-                    {result.photos && result.photos.length > 0 ? (
-                      <DriveImage
-                        fileId={result.photos[0].fileId || result.photos[0]}
-                        accessToken={accessToken}
-                        alt="Test result"
-                        className="result-tile-photo"
-                      />
-                    ) : (
-                      <div className="result-tile-photo-placeholder">🏺</div>
-                    )}
-                    <div className="result-tile-date">{result.date}</div>
-                    <StarDisplay value={result.rating} />
-                  </div>
-                )}
-              </button>
-            ))}
+            {recipeResults.map((session, i) => {
+              const bestRating = session.tiles?.reduce((max, t) => Math.max(max, t.rating || 0), 0) || 0
+              const allComplete = session.tiles?.every(t => t.status === 'completed')
+              const firstCompletedTile = session.tiles?.find(t => t.status === 'completed' && t.photos?.length > 0)
+              const firstPhoto = firstCompletedTile?.photos?.[0]
+
+              return (
+                <button key={i} className={`result-tile ${allComplete ? 'completed' : 'pending'}`}
+                  onClick={() => setSelectedResult(session)}>
+                  {!allComplete ? (
+                    <div className="result-tile-pending">
+                      <div className="result-tile-icon">⏳</div>
+                      <div className="result-tile-date">{session.date}</div>
+                      <div className="result-tile-label">
+                        {session.tiles?.length || 0} tile{session.tiles?.length !== 1 ? 's' : ''}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="result-tile-completed">
+                      {firstPhoto ? (
+                        <DriveImage fileId={firstPhoto.fileId}
+                          accessToken={accessToken} alt="Test result" className="result-tile-photo" />
+                      ) : (
+                        <div className="result-tile-photo-placeholder">🏺</div>
+                      )}
+                      <div className="result-tile-date">{session.date}</div>
+                      <StarDisplay value={bestRating} />
+                    </div>
+                  )}
+                </button>
+              )
+            })}
           </div>
         )}
       </div>
@@ -508,11 +547,7 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onS
               ))}
             </div>
           </div>
-          <StullChart
-            al2o3={stull.x}
-            sio2={stull.y}
-            zone={stull.zone}
-          />
+          <StullChart al2o3={stull.x} sio2={stull.y} zone={stull.zone} />
         </div>
       )}
 
