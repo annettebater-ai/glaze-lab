@@ -1,3 +1,4 @@
+
 import { useState } from 'react'
 import {
   Page,
@@ -8,7 +9,6 @@ import {
   Badge,
   Modal,
   TextField,
-  Select,
   Spinner,
 } from '@shopify/polaris'
 import DriveImage from './DriveImage'
@@ -105,13 +105,16 @@ function GlazeInventoryDetail({
   const allTypes = objectTypes || DEFAULT_OBJECT_TYPES
   const isCommercial = entry.entryType === 'commercial'
 
-  const relevantResults = (testResults || [])
-    .filter(r => r.recipeSlug === entry.recipeSlug && r.status === 'completed')
+  // New tile-based data model
+  const relevantSessions = (testResults || [])
+    .filter(r => r.recipeSlug === entry.recipeSlug)
     .sort((a, b) => new Date(b.date) - new Date(a.date))
 
-  const bestRating = relevantResults.reduce((max, r) => Math.max(max, r.rating || 0), 0)
-  const allPhotos = relevantResults.flatMap(r => r.photos || []).filter(p => p.fileId)
-  const layeringResults = relevantResults.filter(r => r.layers && r.layers.length > 1)
+  const allTiles = relevantSessions.flatMap(s => s.tiles || [])
+  const completedTiles = allTiles.filter(t => t.status === 'completed')
+  const bestRating = completedTiles.reduce((max, t) => Math.max(max, t.rating || 0), 0)
+  const allPhotos = completedTiles.flatMap(t => t.photos || []).filter(p => p.fileId)
+  const layeringTiles = completedTiles.filter(t => t.layers && t.layers.length > 1)
 
   const costPerGram = entry.batchCost && entry.batchGrams ? entry.batchCost / entry.batchGrams : null
   const glazeDensity = entry.sg || 1.45
@@ -151,7 +154,7 @@ Suggest layering combinations and application order. What works well together an
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-sonnet-4-6',
           max_tokens: 600,
           messages: [{ role: 'user', content: prompt }]
         })
@@ -287,28 +290,30 @@ Suggest layering combinations and application order. What works well together an
           </Card>
         )}
 
-        {layeringResults.length > 0 && (
+        {layeringTiles.length > 0 && (
           <Card>
             <BlockStack gap="300">
               <Text variant="headingSm">Tested Layering Combinations</Text>
-              {layeringResults.map((r, i) => (
-                <div key={i} style={{paddingBottom: '12px', borderBottom: i < layeringResults.length - 1 ? '1px solid #f0f0f0' : 'none'}}>
+              {layeringTiles.map((tile, i) => (
+                <div key={i} style={{paddingBottom: '12px', borderBottom: i < layeringTiles.length - 1 ? '1px solid #f0f0f0' : 'none'}}>
                   <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '6px'}}>
-                    <Text variant="bodySm" tone="subdued">{r.date} · {r.clayBody}</Text>
-                    <div className="star-display" style={{fontSize: '11px'}}>
-                      {[1,2,3,4,5].map(n => (
-                        <span key={n} className={`star-icon ${n <= (r.rating || 0) ? 'active' : ''}`}>★</span>
-                      ))}
-                    </div>
+                    <Text variant="bodySm" tone="subdued">{tile.clayBody}</Text>
+                    {tile.rating > 0 && (
+                      <div className="star-display" style={{fontSize: '11px'}}>
+                        {[1,2,3,4,5].map(n => (
+                          <span key={n} className={`star-icon ${n <= tile.rating ? 'active' : ''}`}>★</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  {r.layers?.map((l, li) => (
+                  {tile.layers?.map((l, li) => (
                     <div key={li} style={{display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#555', padding: '2px 0'}}>
                       <span style={{width: '18px', height: '18px', borderRadius: '50%', background: '#1a3a5c', color: 'white', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0}}>{li + 1}</span>
                       <span style={{fontWeight: 500}}>{l.type}</span>
                       <span style={{color: '#888'}}>— {l.recipe}</span>
                     </div>
                   ))}
-                  {r.notesAfter && <p style={{margin: '6px 0 0', fontSize: '13px', color: '#888'}}>{r.notesAfter}</p>}
+                  {tile.notesAfter && <p style={{margin: '6px 0 0', fontSize: '13px', color: '#888'}}>{tile.notesAfter}</p>}
                 </div>
               ))}
             </BlockStack>
@@ -336,24 +341,26 @@ Suggest layering combinations and application order. What works well together an
           </BlockStack>
         </Card>
 
-        {relevantResults.length > 0 && (
+        {completedTiles.length > 0 && (
           <Card>
             <BlockStack gap="300">
               <Text variant="headingSm">Test Results</Text>
-              {relevantResults.map((r, i) => (
-                <div key={i} style={{paddingBottom: '10px', borderBottom: i < relevantResults.length - 1 ? '1px solid #f0f0f0' : 'none'}}>
+              {completedTiles.map((tile, i) => (
+                <div key={i} style={{paddingBottom: '10px', borderBottom: i < completedTiles.length - 1 ? '1px solid #f0f0f0' : 'none'}}>
                   <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
                     <div>
-                      <Text variant="bodySm" fontWeight="semibold">{r.clayBody}</Text>
-                      <Text variant="bodySm" tone="subdued">{r.date}</Text>
+                      {tile.clayBody && <Text variant="bodySm" fontWeight="semibold">{tile.clayBody}</Text>}
+                      {tile.firingType && <Text variant="bodySm" tone="subdued">{tile.firingType}</Text>}
                     </div>
-                    <div className="star-display" style={{fontSize: '12px'}}>
-                      {[1,2,3,4,5].map(n => (
-                        <span key={n} className={`star-icon ${n <= (r.rating || 0) ? 'active' : ''}`}>★</span>
-                      ))}
-                    </div>
+                    {tile.rating > 0 && (
+                      <div className="star-display" style={{fontSize: '12px'}}>
+                        {[1,2,3,4,5].map(n => (
+                          <span key={n} className={`star-icon ${n <= tile.rating ? 'active' : ''}`}>★</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  {r.notesAfter && <p style={{margin: '4px 0 0', fontSize: '13px', color: '#888'}}>{r.notesAfter}</p>}
+                  {tile.notesAfter && <p style={{margin: '4px 0 0', fontSize: '13px', color: '#888'}}>{tile.notesAfter}</p>}
                 </div>
               ))}
             </BlockStack>
@@ -493,7 +500,6 @@ export default function GlazeInventoryScreen({
         ) : (
           <Card padding="0">
             <div>
-              {/* Table header */}
               <div style={{display: 'grid', gridTemplateColumns: '1fr 120px 100px 80px', padding: '10px 16px', borderBottom: '1px solid #f0f0f0', background: '#fafafa'}}>
                 <Text variant="bodySm" fontWeight="semibold" tone="subdued">Name</Text>
                 <Text variant="bodySm" fontWeight="semibold" tone="subdued">Type</Text>
