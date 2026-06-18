@@ -62,7 +62,7 @@ function ClayBodyForm({ existing, onSave, onCancel }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-sonnet-4-6',
           max_tokens: 1000,
           system: `You are a ceramic materials expert. When given a clay body name, look up its known chemistry and physical properties. Respond ONLY with this JSON format, no markdown, no preamble:
 {
