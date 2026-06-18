@@ -92,7 +92,7 @@ function CommercialGlazeForm({ existing, onSave, onCancel }) {
 }
 
 function GlazeInventoryDetail({
-  entry, recipe, testResults, recipes, accessToken, objectTypes,
+  entry, recipe, testResults, recipes, materials, accessToken, objectTypes,
   onUpdate, onDelete, onMixNew, onBack,
 }) {
   const [status, setStatus] = useState(getStatus(entry))
@@ -126,6 +126,31 @@ function GlazeInventoryDetail({
   const defaultObj = allTypes.find(o => o.category === 'Mug' && o.variant === 'MD') || allTypes[0]
   const defaultDipCost = defaultObj ? getDipCost(defaultObj) : null
   const groupedTypes = groupByCategory(allTypes)
+
+  const handleUpdateCosts = () => {
+    if (!recipe || !entry.batchGrams) return
+    const allIngredients = [
+      ...(recipe.baseIngredients || []),
+      ...(recipe.additives || [])
+    ].filter(i => i.material)
+    let totalCost = 0
+    let hasAnyCost = false
+    let hasEstimated = false
+    for (const ing of allIngredients) {
+      const mat = (materials || []).find(m => m.name.toLowerCase() === ing.material.toLowerCase())
+      if (!mat || !mat.price || !mat.priceUnit) continue
+      const unitsToGrams = { g: 1, kg: 1000, lb: 453.592, oz: 28.3495 }
+      const gramsPerUnit = unitsToGrams[mat.priceUnit] || 1000
+      const pricePerGram = mat.price / gramsPerUnit
+      const usedGrams = entry.batchGrams * ing.percent / 100
+      totalCost += pricePerGram * usedGrams
+      hasAnyCost = true
+      if (mat.priceApproximate) hasEstimated = true
+    }
+    if (hasAnyCost) {
+      onUpdate({ ...entry, batchCost: parseFloat(totalCost.toFixed(2)), batchCostEstimated: hasEstimated })
+    }
+  }
 
   const handleStatusChange = (newStatus) => {
     setStatus(newStatus)
@@ -234,6 +259,12 @@ Suggest layering combinations and application order. What works well together an
                   <button type="button" onClick={onMixNew}
                     style={{padding: '8px 16px', background: '#1a3a5c', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer'}}>
                     Mix New Batch
+                  </button>
+                )}
+                {!isCommercial && !entry.batchCost && recipe && entry.batchGrams && (
+                  <button type="button" onClick={handleUpdateCosts}
+                    style={{padding: '8px 16px', background: '#c8a96e', color: '#1a1a1a', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer'}}>
+                    Update Costs
                   </button>
                 )}
                 {isCommercial && (
@@ -444,6 +475,7 @@ export default function GlazeInventoryScreen({
         testResults={testResults}
         accessToken={accessToken}
         objectTypes={objectTypes}
+        materials={materials}
         onUpdate={(updated) => { onUpdateEntry(updated); setSelectedEntry(updated) }}
         onDelete={(entry) => { onDeleteEntry(entry); setSelectedEntry(null) }}
         onMixNew={() => { const r = recipes?.find(r => r.id === selectedEntry.recipeId); if (r) onMixNew(r) }}
