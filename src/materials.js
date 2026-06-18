@@ -7,7 +7,8 @@ amount: ${material.amount}
 unit: ${material.unit}
 starting-amount: ${material.startingAmount}
 is-approximate: ${material.isApproximate ? 'true' : 'false'}
-total-cost: ${material.totalCost || ''}
+price: ${material.price || ''}
+price-unit: ${material.priceUnit || ''}
 price-approximate: ${material.priceApproximate ? 'true' : 'false'}
 notes: ${material.notes || ''}
 created: ${material.created}
@@ -39,7 +40,8 @@ export function markdownToMaterial(content, fileId) {
       unit: get('unit') || 'g',
       startingAmount: parseFloat(get('starting-amount')) || 0,
       isApproximate: get('is-approximate') === 'true',
-      totalCost: get('total-cost') ? parseFloat(get('total-cost')) : null,
+      price: get('price') ? parseFloat(get('price')) : null,
+      priceUnit: get('price-unit') || 'kg',
       priceApproximate: get('price-approximate') === 'true',
       notes: get('notes'),
       created: get('created'),
