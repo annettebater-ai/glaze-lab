@@ -8,30 +8,22 @@ import {
   TextField,
   Select,
   Modal,
-  Badge,
 } from '@shopify/polaris'
-import { getStockStatus } from './materials'
 import './MaterialsScreen.css'
 
 const UNITS = [
-  { label: 'grams (g)', value: 'g' },
-  { label: 'kilograms (kg)', value: 'kg' },
-  { label: 'pounds (lb)', value: 'lb' },
-  { label: 'ounces (oz)', value: 'oz' },
+  { label: 'g', value: 'g' },
+  { label: 'kg', value: 'kg' },
+  { label: 'lb', value: 'lb' },
+  { label: 'oz', value: 'oz' },
 ]
 
 const PRICE_UNITS = [
   { label: 'per kg', value: 'kg' },
+  { label: 'per g', value: 'g' },
   { label: 'per lb', value: 'lb' },
   { label: 'per oz', value: 'oz' },
-  { label: 'per g', value: 'g' },
 ]
-
-const STATUS_BADGE = {
-  ok: null,
-  low: <Badge tone="warning">Low</Badge>,
-  out: <Badge tone="critical">Out</Badge>,
-}
 
 function MaterialForm({ existing, onSave, onCancel }) {
   const [name, setName] = useState(existing?.name || '')
@@ -42,6 +34,49 @@ function MaterialForm({ existing, onSave, onCancel }) {
   const [priceUnit, setPriceUnit] = useState(existing?.priceUnit || 'kg')
   const [priceApproximate, setPriceApproximate] = useState(existing?.priceApproximate || false)
   const [notes, setNotes] = useState(existing?.notes || '')
+  const [loadingPrice, setLoadingPrice] = useState(false)
+  const [priceError, setPriceError] = useState('')
+
+  const handleGetMarketPrice = async () => {
+    if (!name.trim()) return
+    setLoadingPrice(true)
+    setPriceError('')
+    try {
+      const response = await fetch('/api/claude', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 300,
+          messages: [{
+            role: 'user',
+            content: `You are a Canadian pottery supply pricing assistant. Estimate the current retail price in CAD for "${name.trim()}" as a ceramic glaze material from Canadian suppliers like PSH (The Pottery Supply House), Tuckers Pottery, Great White North Pottery, and Sounding Stone.
+
+Respond with ONLY a JSON object in this exact format, no other text:
+{"price": 24.99, "unit": "kg", "note": "brief explanation"}
+
+The unit should be "kg" or "g" depending on how this material is typically sold. Base the price on a typical purchase quantity.`
+          }]
+        })
+      })
+      const data = await response.json()
+      const text = data.content?.[0]?.text || ''
+      const clean = text.replace(/```json|```/g, '').trim()
+      const parsed = JSON.parse(clean)
+      if (parsed.price && parsed.unit) {
+        setPrice(String(parsed.price))
+        setPriceUnit(parsed.unit)
+        setPriceApproximate(true)
+        setPriceError('')
+      } else {
+        setPriceError('Could not get a price estimate. Try entering manually.')
+      }
+    } catch (err) {
+      setPriceError('Failed to get market price. Check your connection.')
+    } finally {
+      setLoadingPrice(false)
+    }
+  }
 
   const handleSave = () => {
     if (!name.trim()) { alert('Please enter a material name'); return }
@@ -104,7 +139,25 @@ function MaterialForm({ existing, onSave, onCancel }) {
 
         <Card>
           <BlockStack gap="300">
-            <Text variant="headingSm">Price (CAD)</Text>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+              <Text variant="headingSm">Price (CAD)</Text>
+              <button type="button" onClick={handleGetMarketPrice} disabled={loadingPrice || !name.trim()}
+                style={{
+                  padding: '6px 12px',
+                  background: loadingPrice ? '#f0f0f0' : '#1a1a1a',
+                  color: loadingPrice ? '#888' : 'white',
+                  border: 'none', borderRadius: '6px',
+                  fontSize: '12px', fontWeight: 600,
+                  cursor: loadingPrice || !name.trim() ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '6px'
+                }}>
+                <span style={{color: '#c8a96e'}}>✦</span>
+                {loadingPrice ? 'Looking up...' : 'Get Market Price'}
+              </button>
+            </div>
+            {priceError && (
+              <div style={{fontSize: '12px', color: '#cc2200', padding: '4px 0'}}>{priceError}</div>
+            )}
             <InlineStack gap="300" blockAlign="end">
               <div style={{flex: 1}}>
                 <TextField label="Price" type="number" placeholder="e.g. 24.99"
@@ -119,7 +172,7 @@ function MaterialForm({ existing, onSave, onCancel }) {
                 onChange={e => setPriceApproximate(e.target.checked)}
                 style={{width: '16px', height: '16px', cursor: 'pointer'}} />
               <label htmlFor="price-approx" style={{fontSize: '14px', color: '#1a1a1a', cursor: 'pointer'}}>
-                Price is estimated
+                {priceApproximate ? 'Market estimate (set by Sidekick)' : 'Price is estimated'}
               </label>
             </div>
           </BlockStack>
@@ -153,17 +206,14 @@ export default function MaterialsScreen({ materials, onSaveMaterial, onDeleteMat
   const [showForm, setShowForm] = useState(false)
   const [editingMaterial, setEditingMaterial] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
-  const [search, setSearch] = useState('')
-
-  const filtered = materials
-    .filter(m => !search || m.name.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => a.name.localeCompare(b.name))
 
   const handleSave = (material) => {
     onSaveMaterial(material)
     setShowForm(false)
     setEditingMaterial(null)
   }
+
+  const sorted = [...materials].sort((a, b) => a.name.localeCompare(b.name))
 
   if (showForm || editingMaterial) {
     return (
@@ -175,7 +225,7 @@ export default function MaterialsScreen({ materials, onSaveMaterial, onDeleteMat
         }}
       >
         <MaterialForm
-          existing={editingMaterial || null}
+          existing={editingMaterial}
           onSave={handleSave}
           onCancel={() => { setShowForm(false); setEditingMaterial(null) }}
         />
@@ -186,79 +236,97 @@ export default function MaterialsScreen({ materials, onSaveMaterial, onDeleteMat
   return (
     <Page
       title="Materials"
-      primaryAction={{
-        content: 'Add Material',
-        onAction: () => { setEditingMaterial(null); setShowForm(true) }
-      }}
+      primaryAction={{ content: 'Add Material', onAction: () => { setEditingMaterial(null); setShowForm(true) } }}
     >
       <BlockStack gap="400">
-        <Card>
-          <TextField label="Search" labelHidden placeholder="Search materials..."
-            value={search} onChange={setSearch} autoComplete="off"
-            clearButton onClearButtonClick={() => setSearch('')} />
-        </Card>
-
-        {filtered.length === 0 ? (
+        {sorted.length === 0 ? (
           <Card>
-            <Text tone="subdued">
-              {search ? 'No materials match your search.' : 'No materials yet. Add your first material to start tracking inventory.'}
-            </Text>
+            <div style={{padding: '32px', textAlign: 'center'}}>
+              <Text tone="subdued">No materials yet. Add materials to track your inventory and enable cost calculations.</Text>
+            </div>
           </Card>
         ) : (
           <Card padding="0">
-            {filtered.map((material, i) => {
-              const status = getStockStatus(material)
-              const amountDisplay = `${material.amount} ${material.unit}`
-              const priceDisplay = material.price
-                ? `$${material.price.toFixed(2)}/${material.priceUnit}${material.priceApproximate ? ' (est.)' : ''}`
-                : null
-              return (
-                <div key={material.id}
-                  className={`material-row ${i < filtered.length - 1 ? 'with-border' : ''}`}>
-                  <div className="material-row-left">
-                    <div className="material-row-name">
-                      {material.name}
-                      {material.isApproximate && (
-                        <span className="approx-badge">~approx</span>
+            <div>
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 100px 120px 100px', padding: '10px 16px', borderBottom: '1px solid #f0f0f0', background: '#fafafa'}}>
+                <Text variant="bodySm" fontWeight="semibold" tone="subdued">Name</Text>
+                <Text variant="bodySm" fontWeight="semibold" tone="subdued">Stock</Text>
+                <Text variant="bodySm" fontWeight="semibold" tone="subdued">Price</Text>
+                <Text variant="bodySm" fontWeight="semibold" tone="subdued">Actions</Text>
+              </div>
+              {sorted.map((material, index) => {
+                const priceDisplay = material.price
+                  ? `$${material.price.toFixed(2)}/${material.priceUnit}${material.priceApproximate ? ' est.' : ''}`
+                  : '—'
+                const stockStatus = material.amount <= 0 ? 'out' :
+                  (material.startingAmount > 0 && material.amount / material.startingAmount <= 0.25) ? 'low' : 'ok'
+
+                return (
+                  <div key={material.id} style={{
+                    display: 'grid', gridTemplateColumns: '1fr 100px 120px 100px',
+                    padding: '12px 16px', alignItems: 'center',
+                    borderBottom: index < sorted.length - 1 ? '1px solid #f5f5f5' : 'none',
+                    background: 'white',
+                  }}>
+                    <div>
+                      <div style={{fontSize: '14px', fontWeight: 600, color: '#1a1a1a'}}>{material.name}</div>
+                      {material.notes && <div style={{fontSize: '12px', color: '#888'}}>{material.notes}</div>}
+                    </div>
+                    <div>
+                      <span style={{fontSize: '13px', fontWeight: 600, color: stockStatus === 'out' ? '#cc2200' : stockStatus === 'low' ? '#aa7700' : '#1a3a5c'}}>
+                        {material.amount}{material.unit}
+                      </span>
+                      {material.isApproximate && <span style={{fontSize: '11px', color: '#888'}}> ~</span>}
+                      {stockStatus !== 'ok' && (
+                        <div>
+                          <span style={{
+                            fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '8px', textTransform: 'uppercase',
+                            background: stockStatus === 'out' ? '#fff0f0' : '#fff8e1',
+                            color: stockStatus === 'out' ? '#cc2200' : '#aa7700',
+                          }}>
+                            {stockStatus === 'out' ? 'Out' : 'Low'}
+                          </span>
+                        </div>
                       )}
                     </div>
-                    {priceDisplay && (
-                      <div className="material-row-price">{priceDisplay}</div>
-                    )}
-                  </div>
-                  <div className="material-row-right">
-                    <div className="material-row-amount">
-                      {amountDisplay}
-                      {status && status !== 'ok' && (
-                        <span style={{marginLeft: '8px'}}>{STATUS_BADGE[status]}</span>
-                      )}
+                    <div>
+                      <span style={{
+                        fontSize: '13px', color: material.price ? '#1a1a1a' : '#aaa',
+                        fontStyle: material.price ? 'normal' : 'italic'
+                      }}>
+                        {priceDisplay}
+                      </span>
                     </div>
-                    <div className="material-row-actions">
-                      <button type="button" className="material-action-btn"
-                        onClick={() => setEditingMaterial(material)}>
+                    <div style={{display: 'flex', gap: '6px'}}>
+                      <button type="button" onClick={() => setEditingMaterial(material)}
+                        className="material-action-btn">
                         Edit
                       </button>
-                      <button type="button" className="material-action-btn danger"
-                        onClick={() => setDeleteTarget(material)}>
+                      <button type="button" onClick={() => setDeleteTarget(material)}
+                        className="material-action-btn danger">
                         Delete
                       </button>
                     </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </Card>
         )}
       </BlockStack>
 
-      <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete material?"
+      <Modal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete material?"
         primaryAction={{
           content: 'Delete', destructive: true,
           onAction: () => { onDeleteMaterial(deleteTarget); setDeleteTarget(null) }
         }}
-        secondaryActions={[{ content: 'Cancel', onAction: () => setDeleteTarget(null) }]}>
+        secondaryActions={[{ content: 'Cancel', onAction: () => setDeleteTarget(null) }]}
+      >
         <Modal.Section>
-          <Text>Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This cannot be undone.</Text>
+          <Text>This will permanently delete {deleteTarget?.name} from your materials library.</Text>
         </Modal.Section>
       </Modal>
     </Page>
