@@ -1,832 +1,646 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import {
   Page,
-  Text,
-  Button,
-  InlineStack,
-  Spinner,
   Card,
   BlockStack,
+  InlineStack,
+  Text,
+  Badge,
+  Modal,
+  TextField,
+  Spinner,
 } from '@shopify/polaris'
-import RecipeTable from './RecipeTable'
-import RecipeForm from './RecipeForm'
-import RecipeDetail from './RecipeDetail'
-import MixingSession from './MixingSession'
-import MaterialsScreen from './MaterialsScreen'
-import ClayBodiesScreen from './ClayBodiesScreen'
-import TestsScreen from './TestsScreen'
-import GlazeInventoryScreen from './GlazeInventoryScreen'
-import {
-  ensureVaultStructure,
-  listFiles,
-  readFile,
-  createFile,
-  findFile,
-  updateFile,
-  recipeToMarkdown,
-  markdownToRecipe
-} from './drive'
-import { testResultToMarkdown, markdownToTestResult } from './testResults'
-import { materialToMarkdown, markdownToMaterial, toGrams, fromGrams } from './materials'
-import { clayBodyToMarkdown, markdownToClayBody } from './clayBodies'
-import { glazeInventoryToMarkdown, markdownToGlazeInventory } from './glazeInventory'
-import { DEFAULT_OBJECT_TYPES } from './objectTypes'
-import './App.css'
+import DriveImage from './DriveImage'
+import TestResultForm from './TestResultForm'
+import { calcSurfaceArea, calcGlazeVolume, groupByCategory, DEFAULT_OBJECT_TYPES } from './objectTypes'
+import { newTile } from './testResults'
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
-const REDIRECT_URI = window.location.hostname === 'localhost'
-  ? 'http://localhost:5173'
-  : 'https://glaze-lab-six.vercel.app'
-const SCOPES = [
-  'https://www.googleapis.com/auth/drive.file',
-  'https://www.googleapis.com/auth/userinfo.profile',
-  'https://www.googleapis.com/auth/userinfo.email'
-].join(' ')
+const STATUS_OPTIONS = ['in-stock', 'low', 'used-up']
+const STATUS_LABELS = { 'in-stock': 'In Stock', 'low': 'Low', 'used-up': 'Used Up' }
+const STATUS_TONES = { 'in-stock': 'success', 'low': 'warning', 'used-up': 'critical' }
 
-const GlazeNotesLogo = () => (
-  <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
-    <rect x="5" y="12" width="18" height="13" rx="2" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5"/>
-    <rect x="10" y="17" width="8" height="8" rx="1" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.4)" strokeWidth="1"/>
-    <path d="M14 11 C14 11 11 8 12 5 C12 5 13 7 14 6 C14 6 15 4 16 5 C17 7 14 11 14 11Z" fill="#c8a96e"/>
-    <path d="M14 10 C14 10 12.5 8.5 13 7 C13.5 8 14 7.5 14 7.5 C14 7.5 14.5 8 15 7 C15.5 8.5 14 10 14 10Z" fill="#f0c878"/>
-    <line x1="12" y1="20" x2="16" y2="20" stroke="rgba(255,255,255,0.4)" strokeWidth="1" strokeLinecap="round"/>
-    <line x1="12" y1="22" x2="15" y2="22" stroke="rgba(255,255,255,0.4)" strokeWidth="1" strokeLinecap="round"/>
-  </svg>
-)
+const FIRING_TYPE_LABELS = {
+  'cone-6-ox': 'Cone 6 Ox', 'cone-10-red': 'Cone 10 Red', 'cone-04-ox': 'Cone 04 Ox',
+  'wood': 'Wood Fire', 'soda': 'Soda Fire', 'salt': 'Salt Fire', 'raku': 'Raku', 'other': 'Other',
+}
 
-const BurgerIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-    <path d="M2 5h16M2 10h16M2 15h16" stroke="rgba(255,255,255,0.8)" strokeWidth="1.5" strokeLinecap="round"/>
-  </svg>
-)
+function getStatus(entry) {
+  if (entry.isUsedUp) return 'used-up'
+  if (entry.isLow) return 'low'
+  return 'in-stock'
+}
 
-const SearchIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
-    <circle cx="9" cy="9" r="7" stroke="rgba(255,255,255,0.6)" strokeWidth="2"/>
-    <path d="M15 15l3 3" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round"/>
-  </svg>
-)
+function statusToFlags(status) {
+  return { isLow: status === 'low', isUsedUp: status === 'used-up' }
+}
 
-const NAV_ITEMS = [
-  { id: 'glaze-inventory', label: 'Glaze Inventory' },
-  { id: 'recipes', label: 'Recipes' },
-  { id: 'tests', label: 'Tests' },
-  { id: 'clay-bodies', label: 'Clay Bodies' },
-  { id: 'materials', label: 'Materials' },
-]
+function CommercialGlazeForm({ existing, onSave, onCancel }) {
+  const [name, setName] = useState(existing?.recipeName || '')
+  const [brand, setBrand] = useState(existing?.brand || '')
+  const [colour, setColour] = useState(existing?.colour || '')
+  const [coneRange, setConeRange] = useState(existing?.coneRange || '')
+  const [notes, setNotes] = useState(existing?.notes || '')
+  const [errors, setErrors] = useState({})
 
-function App() {
-  const [isSignedIn, setIsSignedIn] = useState(false)
-  const [userName, setUserName] = useState('')
-  const [userEmail, setUserEmail] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [currentScreen, setCurrentScreen] = useState('glaze-inventory')
-  const [accessToken, setAccessToken] = useState(null)
-  const [showNewRecipe, setShowNewRecipe] = useState(false)
-  const [editingRecipe, setEditingRecipe] = useState(null)
-  const [recipes, setRecipes] = useState([])
-  const [testResults, setTestResults] = useState([])
-  const [mixingSessions, setMixingSessions] = useState([])
-  const [materials, setMaterials] = useState([])
-  const [clayBodies, setClayBodies] = useState([])
-  const [objectTypes, setObjectTypes] = useState(DEFAULT_OBJECT_TYPES)
-  const [glazeInventory, setGlazeInventory] = useState([])
-  const [vaultFolders, setVaultFolders] = useState(null)
-  const [statusMessage, setStatusMessage] = useState('')
-  const [selectedRecipe, setSelectedRecipe] = useState(null)
-  const [mixingRecipe, setMixingRecipe] = useState(null)
-  const [navOpen, setNavOpen] = useState(false)
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
-
-  useEffect(() => {
-    const hash = window.location.hash
-    if (hash && hash.includes('access_token')) {
-      const tokenMatch = hash.match(/access_token=([^&]+)/)
-      const token = tokenMatch ? tokenMatch[1] : null
-      if (token) {
-        localStorage.setItem('google_access_token', token)
-        history.replaceState(null, null, window.location.pathname)
-        fetchUserInfo(token)
-      } else {
-        setLoading(false)
-      }
-    } else {
-      const storedToken = localStorage.getItem('google_access_token')
-      if (storedToken) {
-        fetchUserInfo(storedToken)
-      } else {
-        setLoading(false)
-      }
-    }
-  }, [])
-
-  const fetchUserInfo = async (token) => {
-    try {
-      const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (response.ok) {
-        setUserName(data.given_name || data.email)
-        setUserEmail(data.email || '')
-        setAccessToken(token)
-        setIsSignedIn(true)
-        initVault(token)
-      } else {
-        localStorage.removeItem('google_access_token')
-        setLoading(false)
-      }
-    } catch (error) {
-      localStorage.removeItem('google_access_token')
-      setLoading(false)
-    }
-  }
-
-  const initVault = async (token) => {
-    try {
-      setStatusMessage('Setting up vault...')
-      const folders = await ensureVaultStructure(token)
-      setVaultFolders(folders)
-      setStatusMessage('Loading recipes...')
-      await loadRecipes(token, folders.recipes)
-      setStatusMessage('Loading tests...')
-      await loadTestResults(token, folders.testResults)
-      setStatusMessage('Loading materials...')
-      await loadMaterials(token, folders.materials)
-      setStatusMessage('Loading clay bodies...')
-      await loadClayBodies(token, folders.clayBodies)
-      setStatusMessage('Loading glaze inventory...')
-      await loadGlazeInventory(token, folders.glazeInventory)
-      setStatusMessage('')
-    } catch (error) {
-      console.error('Vault init error:', error)
-      setStatusMessage('Error connecting to Drive')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadRecipes = async (token, folderId) => {
-    try {
-      const files = await listFiles(token, folderId)
-      const loaded = await Promise.all(
-        files.map(async (file) => {
-          try {
-            const content = await readFile(token, file.id)
-            return markdownToRecipe(content, file.id)
-          } catch (e) { return null }
-        })
-      )
-      setRecipes(loaded.filter(Boolean))
-    } catch (error) {
-      console.error('Failed to load recipes:', error)
-    }
-  }
-
-  const loadTestResults = async (token, folderId) => {
-    if (!folderId) return
-    try {
-      const files = await listFiles(token, folderId)
-      const loaded = await Promise.all(
-        files.map(async (file) => {
-          try {
-            const content = await readFile(token, file.id)
-            return markdownToTestResult(content, file.id)
-          } catch (e) { return null }
-        })
-      )
-      setTestResults(loaded.filter(Boolean))
-    } catch (error) {
-      console.error('Failed to load test results:', error)
-    }
-  }
-
-  const loadMaterials = async (token, folderId) => {
-    if (!folderId) return
-    try {
-      const files = await listFiles(token, folderId)
-      const loaded = await Promise.all(
-        files.map(async (file) => {
-          try {
-            const content = await readFile(token, file.id)
-            return markdownToMaterial(content, file.id)
-          } catch (e) { return null }
-        })
-      )
-      setMaterials(loaded.filter(Boolean))
-    } catch (error) {
-      console.error('Failed to load materials:', error)
-    }
-  }
-
-  const loadClayBodies = async (token, folderId) => {
-    if (!folderId) return
-    try {
-      const files = await listFiles(token, folderId)
-      const loaded = await Promise.all(
-        files.map(async (file) => {
-          try {
-            const content = await readFile(token, file.id)
-            return markdownToClayBody(content, file.id)
-          } catch (e) { return null }
-        })
-      )
-      setClayBodies(loaded.filter(Boolean))
-    } catch (error) {
-      console.error('Failed to load clay bodies:', error)
-    }
-  }
-
-  const loadGlazeInventory = async (token, folderId) => {
-    if (!folderId) return
-    try {
-      const files = await listFiles(token, folderId)
-      const loaded = await Promise.all(
-        files.map(async (file) => {
-          try {
-            const content = await readFile(token, file.id)
-            return markdownToGlazeInventory(content, file.id)
-          } catch (e) { return null }
-        })
-      )
-      setGlazeInventory(loaded.filter(Boolean))
-    } catch (error) {
-      console.error('Failed to load glaze inventory:', error)
-    }
-  }
-
-  const handleSaveRecipe = async (recipeData) => {
-    if (!accessToken || !vaultFolders) { alert('Not connected to Drive'); return }
-    const isEdit = !!editingRecipe || !!recipeData.fileId
-    const existingRecipe = editingRecipe || recipes.find(r => r.id === recipeData.id)
-    const newRecipe = {
-      ...recipeData,
-      id: isEdit ? (existingRecipe?.id || recipeData.id) : Date.now().toString(),
-      fileId: isEdit ? (existingRecipe?.fileId || recipeData.fileId) : undefined,
-      created: isEdit ? (existingRecipe?.created || recipeData.created) : new Date().toISOString().split('T')[0],
-      favourite: isEdit ? (existingRecipe?.favourite || false) : false,
-      testCount: isEdit ? (existingRecipe?.testCount || 0) : 0
-    }
-    const slug = newRecipe.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-    const filename = slug + '.md'
-    const content = recipeToMarkdown(newRecipe)
-    try {
-      setStatusMessage('Saving...')
-      if (newRecipe.fileId) {
-        await updateFile(accessToken, newRecipe.fileId, content)
-      } else {
-        const existing = await findFile(accessToken, vaultFolders.recipes, filename)
-        if (existing) {
-          await updateFile(accessToken, existing.id, content)
-          newRecipe.fileId = existing.id
-        } else {
-          const created = await createFile(accessToken, vaultFolders.recipes, filename, content)
-          newRecipe.fileId = created.id
-        }
-      }
-      setRecipes(prev => [newRecipe, ...prev.filter(r => r.id !== newRecipe.id)])
-      if (selectedRecipe?.id === newRecipe.id) setSelectedRecipe(newRecipe)
-      setShowNewRecipe(false)
-      setEditingRecipe(null)
-      setStatusMessage('Saved')
-      setTimeout(() => setStatusMessage(''), 2000)
-    } catch (error) {
-      console.error('Save error:', error)
-      setStatusMessage('Save failed')
-      setTimeout(() => setStatusMessage(''), 3000)
-    }
-  }
-
-  const handleSaveTestResult = async (resultData) => {
-    if (!accessToken || !vaultFolders) { alert('Not connected to Drive'); return }
-    try {
-      setStatusMessage('Saving...')
-      const filename = `${resultData.recipeSlug}-${resultData.id}.md`
-      const content = testResultToMarkdown(resultData)
-      if (resultData.fileId) {
-        await updateFile(accessToken, resultData.fileId, content)
-        setTestResults(prev => prev.map(r => r.id === resultData.id ? resultData : r))
-      } else {
-        const created = await createFile(accessToken, vaultFolders.testResults, filename, content)
-        resultData.fileId = created.id
-        setTestResults(prev => {
-          const exists = prev.find(r => r.id === resultData.id)
-          if (exists) return prev.map(r => r.id === resultData.id ? resultData : r)
-          return [resultData, ...prev]
-        })
-      }
-      setStatusMessage('Saved')
-      setTimeout(() => setStatusMessage(''), 2000)
-    } catch (error) {
-      console.error('Save test result error:', error)
-      setStatusMessage('Save failed')
-      setTimeout(() => setStatusMessage(''), 3000)
-    }
-  }
-
-  const handleDeleteTestResult = async (result) => {
-    if (result.fileId && accessToken) {
-      try {
-        await fetch(
-          `https://www.googleapis.com/drive/v3/files/${result.fileId}`,
-          { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } }
-        )
-      } catch (e) { console.error('Delete test result failed:', e) }
-    }
-    setTestResults(prev => prev.filter(r => r.id !== result.id))
-  }
-
-  const handleSaveMaterial = async (materialData) => {
-    if (!accessToken || !vaultFolders) { alert('Not connected to Drive'); return }
-    try {
-      setStatusMessage('Saving...')
-      const filename = materialData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + materialData.id + '.md'
-      const content = materialToMarkdown(materialData)
-      if (materialData.fileId) {
-        await updateFile(accessToken, materialData.fileId, content)
-        setMaterials(prev => prev.map(m => m.id === materialData.id ? materialData : m))
-      } else {
-        const created = await createFile(accessToken, vaultFolders.materials, filename, content)
-        materialData.fileId = created.id
-        setMaterials(prev => {
-          const exists = prev.find(m => m.id === materialData.id)
-          if (exists) return prev.map(m => m.id === materialData.id ? materialData : m)
-          return [materialData, ...prev]
-        })
-      }
-      setStatusMessage('Saved')
-      setTimeout(() => setStatusMessage(''), 2000)
-    } catch (error) {
-      console.error('Save material error:', error)
-      setStatusMessage('Save failed')
-      setTimeout(() => setStatusMessage(''), 3000)
-    }
-  }
-
-  const handleDeleteMaterial = async (material) => {
-    if (material.fileId && accessToken) {
-      try {
-        await fetch(
-          `https://www.googleapis.com/drive/v3/files/${material.fileId}`,
-          { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } }
-        )
-      } catch (e) { console.error('Delete material failed:', e) }
-    }
-    setMaterials(prev => prev.filter(m => m.id !== material.id))
-  }
-
-  const handleSaveClayBody = async (clayBodyData) => {
-    if (!accessToken || !vaultFolders) { alert('Not connected to Drive'); return }
-    try {
-      setStatusMessage('Saving...')
-      const filename = clayBodyData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + clayBodyData.id + '.md'
-      const content = clayBodyToMarkdown(clayBodyData)
-      if (clayBodyData.fileId) {
-        await updateFile(accessToken, clayBodyData.fileId, content)
-        setClayBodies(prev => prev.map(c => c.id === clayBodyData.id ? clayBodyData : c))
-      } else {
-        const created = await createFile(accessToken, vaultFolders.clayBodies, filename, content)
-        clayBodyData.fileId = created.id
-        setClayBodies(prev => {
-          const exists = prev.find(c => c.id === clayBodyData.id)
-          if (exists) return prev.map(c => c.id === clayBodyData.id ? clayBodyData : c)
-          return [clayBodyData, ...prev]
-        })
-      }
-      setStatusMessage('Saved')
-      setTimeout(() => setStatusMessage(''), 2000)
-    } catch (error) {
-      console.error('Save clay body error:', error)
-      setStatusMessage('Save failed')
-      setTimeout(() => setStatusMessage(''), 3000)
-    }
-  }
-
-  const handleDeleteClayBody = async (clayBody) => {
-    if (clayBody.fileId && accessToken) {
-      try {
-        await fetch(
-          `https://www.googleapis.com/drive/v3/files/${clayBody.fileId}`,
-          { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } }
-        )
-      } catch (e) { console.error('Delete clay body failed:', e) }
-    }
-    setClayBodies(prev => prev.filter(c => c.id !== clayBody.id))
-  }
-
-  const handleSaveObjectType = (objectType) => {
-    setObjectTypes(prev => {
-      const exists = prev.find(o => o.id === objectType.id)
-      if (exists) return prev.map(o => o.id === objectType.id ? objectType : o)
-      return [...prev, objectType]
+  const handleSave = () => {
+    const newErrors = {}
+    if (!name.trim()) newErrors.name = 'Name is required'
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return }
+    onSave({
+      ...(existing || {}),
+      id: existing?.id || Date.now().toString(),
+      entryType: 'commercial',
+      recipeName: name,
+      brand, colour, coneRange, notes,
+      dateMixed: existing?.dateMixed || new Date().toISOString().split('T')[0],
+      isLow: existing?.isLow || false,
+      isUsedUp: existing?.isUsedUp || false,
+      batchSize: 0, batchUnit: '', batchGrams: 0,
     })
   }
 
-  const handleDeleteObjectType = (objectType) => {
-    setObjectTypes(prev => prev.filter(o => o.id !== objectType.id))
+  return (
+    <BlockStack gap="300">
+      <TextField label="Product name" placeholder="e.g. Cobalt Blue Satin"
+        value={name} onChange={val => { setName(val); if (errors.name) setErrors({}) }}
+        error={errors.name} autoComplete="off" />
+      <InlineStack gap="300">
+        <div style={{flex: 1}}><TextField label="Brand" placeholder="e.g. Amaco, Duncan" value={brand} onChange={setBrand} autoComplete="off" /></div>
+        <div style={{flex: 1}}><TextField label="Cone range" placeholder="e.g. 06-6" value={coneRange} onChange={setConeRange} autoComplete="off" /></div>
+      </InlineStack>
+      <TextField label="Colour description" placeholder="e.g. Deep cobalt, semi-matte" value={colour} onChange={setColour} autoComplete="off" />
+      <TextField label="Notes" placeholder="Any notes about this glaze..." value={notes} onChange={setNotes} multiline={2} autoComplete="off" />
+      <InlineStack gap="300" align="end">
+        <button type="button" onClick={onCancel}
+          style={{padding: '9px 18px', background: 'white', color: '#1a1a1a', border: '1px solid #c9cccf', borderRadius: '6px', fontSize: '14px', fontWeight: 600, cursor: 'pointer'}}>
+          Cancel
+        </button>
+        <button type="button" onClick={handleSave}
+          style={{padding: '9px 18px', background: '#1a3a5c', color: 'white', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: 600, cursor: 'pointer'}}>
+          {existing ? 'Save Changes' : 'Add to Inventory'}
+        </button>
+      </InlineStack>
+    </BlockStack>
+  )
+}
+
+function GlazeInventoryDetail({
+  entry, recipe, testResults, recipes, accessToken, objectTypes,
+  onUpdate, onDelete, onMixNew, onBack,
+  onSaveTestResult, onDeleteTestResult, clayBodies, photosFolderId,
+}) {
+  const [status, setStatus] = useState(getStatus(entry))
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showDipModal, setShowDipModal] = useState(false)
+  const [layeringAdvice, setLayeringAdvice] = useState('')
+  const [loadingLayering, setLoadingLayering] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [showTestForm, setShowTestForm] = useState(false)
+  const [editingTest, setEditingTest] = useState(null)
+  const [selectedTest, setSelectedTest] = useState(null)
+
+  const allTypes = objectTypes || DEFAULT_OBJECT_TYPES
+  const isCommercial = entry.entryType === 'commercial'
+
+  const recipeSlug = entry.recipeSlug || entry.recipeName?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || ''
+  const relevantTests = (testResults || [])
+    .filter(r => r.recipeSlug === recipeSlug || r.inventoryId === entry.id)
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+
+  const allPhotos = relevantTests
+    .flatMap(r => r.tiles || [])
+    .flatMap(t => t.photos || [])
+    .filter(p => p.fileId)
+
+  const bestRating = relevantTests.reduce((max, r) => {
+    const sessionBest = (r.tiles || []).reduce((m, t) => Math.max(m, t.rating || 0), 0)
+    return Math.max(max, sessionBest)
+  }, 0)
+
+  const costPerGram = entry.batchCost && entry.batchGrams ? entry.batchCost / entry.batchGrams : null
+  const glazeDensity = entry.sg || 1.45
+  const costPerMl = costPerGram ? costPerGram * glazeDensity : null
+  const getDipCost = (obj) => {
+    if (!costPerMl) return null
+    return calcGlazeVolume(calcSurfaceArea(obj)) * costPerMl
+  }
+  const defaultObj = allTypes.find(o => o.category === 'Mug' && o.variant === 'MD') || allTypes[0]
+  const defaultDipCost = defaultObj ? getDipCost(defaultObj) : null
+  const groupedTypes = groupByCategory(allTypes)
+
+  const handleStatusChange = (newStatus) => {
+    setStatus(newStatus)
+    onUpdate({ ...entry, ...statusToFlags(newStatus) })
   }
 
-  const handleSaveGlazeInventoryEntry = async (entry) => {
-    if (!accessToken || !vaultFolders) return
+  const handleAskLayering = async () => {
+    setLoadingLayering(true)
+    setLayeringAdvice('')
     try {
-      const filename = `${entry.recipeSlug || entry.id}-${entry.id}.md`
-      const content = glazeInventoryToMarkdown(entry)
-      if (entry.fileId) {
-        await updateFile(accessToken, entry.fileId, content)
-        setGlazeInventory(prev => prev.map(e => e.id === entry.id ? entry : e))
-      } else {
-        const created = await createFile(accessToken, vaultFolders.glazeInventory, filename, content)
-        entry.fileId = created.id
-        setGlazeInventory(prev => {
-          const exists = prev.find(e => e.id === entry.id)
-          if (exists) return prev.map(e => e.id === entry.id ? entry : e)
-          return [entry, ...prev]
+      const thisRecipe = recipe || recipes?.find(r => r.id === entry.recipeId)
+      const otherGlazes = (recipes || [])
+        .filter(r => r.id !== entry.recipeId && r.chemistry)
+        .slice(0, 6)
+        .map(r => ({ name: r.name, zone: r.chemistry?.stull?.zone }))
+
+      const prompt = isCommercial
+        ? `I have a commercial glaze: "${entry.recipeName}" by ${entry.brand || 'unknown brand'}, cone range ${entry.coneRange || 'unknown'}, colour: ${entry.colour || 'unknown'}.
+My other glazes include: ${otherGlazes.map(g => g.name).join(', ')}
+Suggest layering combinations and application order. Be concise and practical.`
+        : `I have a glaze called "${entry.recipeName}" with chemistry zone: ${thisRecipe?.chemistry?.stull?.zone || 'unknown'}.
+My other glazes: ${otherGlazes.map(g => `${g.name} (${g.zone})`).join(', ')}
+Suggest layering combinations and application order. What works well together and what to avoid? Be concise and practical.`
+
+      const response = await fetch('/api/claude', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 600,
+          messages: [{ role: 'user', content: prompt }]
         })
-      }
-    } catch (error) {
-      console.error('Save glaze inventory error:', error)
+      })
+      const data = await response.json()
+      setLayeringAdvice(data.content?.[0]?.text || 'No advice returned.')
+    } catch (err) {
+      setLayeringAdvice('Failed to get layering advice. Check your connection.')
+    } finally {
+      setLoadingLayering(false)
     }
   }
 
-  const handleDeleteGlazeInventoryEntry = async (entry) => {
-    if (entry.fileId && accessToken) {
-      try {
-        await fetch(
-          `https://www.googleapis.com/drive/v3/files/${entry.fileId}`,
-          { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } }
-        )
-      } catch (e) { console.error('Delete glaze inventory entry failed:', e) }
-    }
-    setGlazeInventory(prev => prev.filter(e => e.id !== entry.id))
-  }
-
-  const handleSessionComplete = async (sessionData) => {
-    const recipe = sessionData.recipe
-    const batchGrams = sessionData.batchGrams
-    if (!batchGrams || !recipe) return
-
-    const allIngredients = [
-      ...(recipe.baseIngredients || []),
-      ...(recipe.additives || [])
-    ].filter(i => i.material)
-
-    const updatedMaterials = [...materials]
-    for (const ing of allIngredients) {
-      const usedGrams = batchGrams * ing.percent / 100
-      const matIndex = updatedMaterials.findIndex(
-        m => m.name.toLowerCase() === ing.material.toLowerCase()
-      )
-      if (matIndex >= 0) {
-        const mat = updatedMaterials[matIndex]
-        const currentGrams = toGrams(mat.amount, mat.unit)
-        const newGrams = Math.max(0, currentGrams - usedGrams)
-        const newAmount = fromGrams(newGrams, mat.unit)
-        updatedMaterials[matIndex] = {
-          ...mat,
-          amount: parseFloat(newAmount.toFixed(3)),
-          isApproximate: true
-        }
-        await handleSaveMaterial(updatedMaterials[matIndex])
-      }
-    }
-    setMaterials(updatedMaterials)
-
-    const inventoryEntry = {
-      id: sessionData.id || Date.now().toString(),
-      entryType: 'mixed',
-      recipeId: recipe.id,
-      recipeSlug: recipe.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      recipeName: recipe.name,
-      dateMixed: sessionData.date,
-      batchSize: sessionData.batchSize,
-      batchUnit: sessionData.unit,
-      batchGrams: sessionData.batchGrams,
-      batchCost: sessionData.batchCost || null,
-      batchCostEstimated: sessionData.batchCostEstimated || false,
-      sg: sessionData.sgMeasured || null,
-      isLow: false,
-      isUsedUp: false,
-      notes: sessionData.notes || '',
-    }
-    await handleSaveGlazeInventoryEntry(inventoryEntry)
-
-    setMixingSessions(prev => [sessionData, ...prev])
-    setMixingRecipe(null)
-    setSelectedRecipe(null)
-  }
-
-  const handleToggleFavourite = (recipeId) => {
-    setRecipes(prev => prev.map(r =>
-      r.id === recipeId ? { ...r, favourite: !r.favourite } : r
-    ))
-  }
-
-  const handleDeleteRecipe = async (recipe) => {
-    if (recipe.fileId && accessToken) {
-      try {
-        await fetch(
-          `https://www.googleapis.com/drive/v3/files/${recipe.fileId}`,
-          { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } }
-        )
-      } catch (e) { console.error('Delete from Drive failed:', e) }
-    }
-    setRecipes(prev => prev.filter(r => r.id !== recipe.id))
-    setSelectedRecipe(null)
-  }
-
-  const handleEditRecipe = (recipe) => {
-    setEditingRecipe(recipe)
-    setShowNewRecipe(true)
-    setSelectedRecipe(null)
-  }
-
-  const handleNavigate = (screen) => {
-    setCurrentScreen(screen)
-    setShowNewRecipe(false)
-    setEditingRecipe(null)
-    setSelectedRecipe(null)
-    setMixingRecipe(null)
-    setNavOpen(false)
-    setUserMenuOpen(false)
-  }
-
-  const handleSignIn = () => {
-    const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' +
-      'client_id=' + GOOGLE_CLIENT_ID +
-      '&redirect_uri=' + encodeURIComponent(REDIRECT_URI) +
-      '&response_type=token' +
-      '&scope=' + encodeURIComponent(SCOPES) +
-      '&prompt=consent'
-    window.location.href = authUrl
-  }
-
-  const handleSignOut = () => {
-    localStorage.removeItem('google_access_token')
-    setIsSignedIn(false)
-    setUserName('')
-    setUserEmail('')
-    setAccessToken(null)
-    setVaultFolders(null)
-    setRecipes([])
-    setTestResults([])
-    setMixingSessions([])
-    setMaterials([])
-    setClayBodies([])
-    setObjectTypes(DEFAULT_OBJECT_TYPES)
-    setGlazeInventory([])
-    setSelectedRecipe(null)
-    setMixingRecipe(null)
-    setEditingRecipe(null)
-    setNavOpen(false)
-    setUserMenuOpen(false)
-  }
-
-  if (loading) {
+  if (editing && isCommercial) {
     return (
-      <div className="loading-screen">
-        <div className="loading-card">
-          <BlockStack gap="400" inlineAlign="center">
-            <Text variant="headingXl" as="h1">Glaze Notes</Text>
-            <Spinner size="small" />
-            <Text variant="bodyMd" tone="subdued">{statusMessage || 'Loading...'}</Text>
-          </BlockStack>
-        </div>
-      </div>
-    )
-  }
-
-  if (!isSignedIn) {
-    return (
-      <div className="login-screen">
-        <div className="login-card">
-          <BlockStack gap="400" inlineAlign="center">
-            <GlazeNotesLogo />
-            <Text variant="headingXl" as="h1">Glaze Notes</Text>
-            <Text variant="bodyMd" tone="subdued">Your personal glaze chemistry studio</Text>
-            <Button variant="primary" size="large" onClick={handleSignIn}>
-              Sign in with Google
-            </Button>
-          </BlockStack>
-        </div>
-      </div>
-    )
-  }
-
-  const userInitial = userName ? userName.charAt(0).toUpperCase() : '?'
-
-  const renderScreen = () => {
-    if (mixingRecipe) {
-      return (
-        <MixingSession
-          recipe={mixingRecipe}
-          materials={materials}
-          objectTypes={objectTypes}
-          onComplete={handleSessionComplete}
-          onCancel={() => setMixingRecipe(null)}
-        />
-      )
-    }
-
-    if (currentScreen === 'glaze-inventory') {
-      return (
-        <GlazeInventoryScreen
-          glazeInventory={glazeInventory}
-          recipes={recipes}
-          testResults={testResults}
-          accessToken={accessToken}
-          objectTypes={objectTypes}
-          onUpdateEntry={handleSaveGlazeInventoryEntry}
-          onDeleteEntry={handleDeleteGlazeInventoryEntry}
-          onMixNew={(recipe) => setMixingRecipe(recipe)}
-        />
-      )
-    }
-
-    if (currentScreen === 'recipes') {
-      if (showNewRecipe) {
-        return (
-          <Page
-            title={editingRecipe ? 'Edit Recipe' : 'New Recipe'}
-            backAction={{
-              content: 'Recipes',
-              onAction: () => { setShowNewRecipe(false); setEditingRecipe(null) }
-            }}
-          >
-            <RecipeForm
-              recipe={editingRecipe}
-              onSave={handleSaveRecipe}
-              onCancel={() => { setShowNewRecipe(false); setEditingRecipe(null) }}
-              materials={materials}
-              onAddMaterial={handleSaveMaterial}
-            />
-          </Page>
-        )
-      }
-      if (selectedRecipe) {
-        return (
-          <Page
-            title={selectedRecipe.name}
-            backAction={{ content: 'Recipes', onAction: () => setSelectedRecipe(null) }}
-          >
-            <RecipeDetail
-              recipe={selectedRecipe}
-              onBack={() => setSelectedRecipe(null)}
-              onStartMix={(recipe) => setMixingRecipe(recipe)}
-              onDelete={handleDeleteRecipe}
-              onSaveRecipe={handleSaveRecipe}
-              onEditRecipe={handleEditRecipe}
-              testResults={testResults}
-              mixingSessions={mixingSessions.filter(s => s.recipeId === selectedRecipe.id)}
-              onSaveTestResult={handleSaveTestResult}
-              onDeleteTestResult={handleDeleteTestResult}
-              accessToken={accessToken}
-              photosFolderId={vaultFolders?.photos}
-              materials={materials}
-              clayBodies={clayBodies}
-            />
-          </Page>
-        )
-      }
-      return (
-        <Page
-          title="Recipes"
-          primaryAction={{
-            content: 'New Recipe',
-            onAction: () => { setEditingRecipe(null); setShowNewRecipe(true) }
-          }}
-        >
-          <BlockStack gap="400">
-            {statusMessage ? (
-              <InlineStack gap="200" align="center">
-                <Spinner size="small" />
-                <Text tone="subdued">{statusMessage}</Text>
-              </InlineStack>
-            ) : null}
-            <RecipeTable
-              recipes={recipes}
-              onSelectRecipe={(recipe) => setSelectedRecipe(recipe)}
-              onToggleFavourite={handleToggleFavourite}
-              onDeleteRecipe={handleDeleteRecipe}
-              onEditRecipe={handleEditRecipe}
-              testResults={testResults}
-              materials={materials}
-            />
-          </BlockStack>
-        </Page>
-      )
-    }
-
-    if (currentScreen === 'tests') {
-      return (
-        <TestsScreen
-          testResults={testResults}
-          recipes={recipes}
-          clayBodies={clayBodies}
-          glazeInventory={glazeInventory}
-          onSaveTestResult={handleSaveTestResult}
-          onDeleteTestResult={handleDeleteTestResult}
-          accessToken={accessToken}
-          photosFolderId={vaultFolders?.photos}
-        />
-      )
-    }
-
-    if (currentScreen === 'materials') {
-      return (
-        <MaterialsScreen
-          materials={materials}
-          onSaveMaterial={handleSaveMaterial}
-          onDeleteMaterial={handleDeleteMaterial}
-        />
-      )
-    }
-
-    if (currentScreen === 'clay-bodies') {
-      return (
-        <ClayBodiesScreen
-          clayBodies={clayBodies}
-          onSaveClayBody={handleSaveClayBody}
-          onDeleteClayBody={handleDeleteClayBody}
-          objectTypes={objectTypes}
-          onSaveObjectType={handleSaveObjectType}
-          onDeleteObjectType={handleDeleteObjectType}
-        />
-      )
-    }
-
-    return (
-      <Page title={currentScreen.charAt(0).toUpperCase() + currentScreen.slice(1).replace('-', ' ')}>
+      <Page title="Edit Commercial Glaze" backAction={{ content: 'Glaze Inventory', onAction: () => setEditing(false) }}>
         <Card>
-          <Text tone="subdued">Coming soon</Text>
+          <CommercialGlazeForm
+            existing={entry}
+            onSave={(updated) => { onUpdate(updated); setEditing(false) }}
+            onCancel={() => setEditing(false)}
+          />
         </Card>
       </Page>
     )
   }
 
-  return (
-    <div className="app-shell">
-      <div className="app-topbar">
-        <button className="topbar-burger" onClick={() => setNavOpen(!navOpen)}>
-          <BurgerIcon />
-        </button>
-        <div className="topbar-logo">
-          <GlazeNotesLogo />
-          <span className="topbar-logo-text">Glaze Notes</span>
-        </div>
-        <div className="topbar-search">
-          <div className="topbar-search-field" onClick={() => handleNavigate('search')}>
-            <SearchIcon />
-            <input type="text" placeholder="Search recipes, materials..." readOnly />
-          </div>
-        </div>
-        <div className="topbar-right">
-          <div className="topbar-user" onClick={() => setUserMenuOpen(!userMenuOpen)}>
-            <div className="topbar-avatar">{userInitial}</div>
-            <span className="topbar-username">{userName}</span>
-            {userMenuOpen && (
-              <div className="user-menu-dropdown">
-                <div className="user-menu-name">{userName}</div>
-                <div className="user-menu-email">{userEmail}</div>
-                <div className="user-menu-divider" />
-                <button className="user-menu-item" onClick={handleSignOut}>Sign out</button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+  if (showTestForm || editingTest) {
+    return (
+      <Page
+        title={editingTest ? 'Edit Test Session' : 'New Test Session'}
+        backAction={{ content: entry.recipeName, onAction: () => { setShowTestForm(false); setEditingTest(null) } }}
+      >
+        <TestResultForm
+          recipe={recipe || { name: entry.recipeName }}
+          existingSession={editingTest || null}
+          accessToken={accessToken}
+          photosFolderId={photosFolderId}
+          clayBodies={clayBodies}
+          onSave={(result) => {
+            result.inventoryId = entry.id
+            result.inventoryName = entry.recipeName
+            onSaveTestResult(result)
+            setShowTestForm(false)
+            setEditingTest(null)
+          }}
+          onCancel={() => { setShowTestForm(false); setEditingTest(null) }}
+          onDelete={editingTest ? (result) => {
+            onDeleteTestResult(result)
+            setEditingTest(null)
+          } : null}
+        />
+      </Page>
+    )
+  }
 
-      {navOpen && (
-        <>
-          <div className="nav-overlay" onClick={() => setNavOpen(false)} />
-          <div className="nav-drawer">
-            <div className="nav-items">
-              {NAV_ITEMS.map(item => (
-                <button
-                  key={item.id}
-                  className={`nav-item ${currentScreen === item.id ? 'active' : ''}`}
-                  onClick={() => handleNavigate(item.id)}
-                >
-                  {item.label}
+  if (selectedTest) {
+    const totalTiles = selectedTest.tiles?.length || 0
+    const completedTiles = selectedTest.tiles?.filter(t => t.status === 'completed').length || 0
+    const bestR = selectedTest.tiles?.reduce((max, t) => Math.max(max, t.rating || 0), 0) || 0
+    return (
+      <Page title={`Test — ${selectedTest.date}`} backAction={{ content: entry.recipeName, onAction: () => setSelectedTest(null) }}>
+        <div className="recipe-detail">
+          <div className="detail-title-block">
+            <div className="detail-type-row">
+              <div className="detail-type">Test Session · {selectedTest.date}</div>
+              <div style={{display: 'flex', gap: '8px'}}>
+                <button className="detail-mix-btn" style={{background: '#1a3a5c'}}
+                  onClick={() => { setEditingTest(selectedTest); setSelectedTest(null) }}>Edit</button>
+                <button className="detail-mix-btn" style={{background: '#cc2200'}}
+                  onClick={() => { onDeleteTestResult(selectedTest); setSelectedTest(null) }}>Delete</button>
+              </div>
+            </div>
+            <h1 className="detail-name">{selectedTest.recipeName}</h1>
+            <div className="detail-meta">{totalTiles} tile{totalTiles !== 1 ? 's' : ''} · {completedTiles}/{totalTiles} complete</div>
+          </div>
+          {bestR > 0 && (
+            <div className="detail-section">
+              <div className="star-display">
+                {[1,2,3,4,5].map(n => <span key={n} className={`star-icon ${n <= bestR ? 'active' : ''}`}>★</span>)}
+              </div>
+            </div>
+          )}
+          <div style={{padding: '0 16px'}}>
+            {selectedTest.tiles?.map((tile, i) => (
+              <div key={tile.id || i} style={{border: '1px solid #e8e8e8', borderRadius: '8px', overflow: 'hidden', marginBottom: '10px'}}>
+                <div style={{background: '#1a1a1a', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                  <div style={{width: '20px', height: '20px', borderRadius: '50%', background: '#c8a96e', color: '#1a1a1a', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>{i + 1}</div>
+                  <span style={{fontSize: '12px', fontWeight: 600, color: 'white'}}>Tile {i + 1}</span>
+                  <span style={{marginLeft: 'auto', fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '8px',
+                    background: tile.status === 'completed' ? '#d4edda' : '#fff3cd',
+                    color: tile.status === 'completed' ? '#155724' : '#856404'}}>
+                    {tile.status === 'completed' ? 'Complete' : 'Pending'}
+                  </span>
+                </div>
+                <div style={{padding: '12px', background: 'white'}}>
+                  {[tile.clayBody, tile.applicationMethod].filter(Boolean).length > 0 && (
+                    <div style={{fontSize: '12px', color: '#888', marginBottom: '6px'}}>{[tile.clayBody, tile.applicationMethod].filter(Boolean).join(' · ')}</div>
+                  )}
+                  {tile.rating > 0 && (
+                    <div className="star-display" style={{justifyContent: 'flex-start', marginBottom: '6px'}}>
+                      {[1,2,3,4,5].map(n => <span key={n} className={`star-icon ${n <= tile.rating ? 'active' : ''}`}>★</span>)}
+                    </div>
+                  )}
+                  {tile.firingType && <p style={{margin: '0 0 6px', fontSize: '12px', color: '#555'}}>{FIRING_TYPE_LABELS[tile.firingType] || tile.firingType}{tile.coneReached ? ` · Cone ${tile.coneReached}` : ''}</p>}
+                  {tile.notesAfter && <p style={{margin: '0 0 6px', fontSize: '12px', color: '#555'}}>{tile.notesAfter}</p>}
+                  {tile.photos?.length > 0 && (
+                    <div className="result-photos-grid">
+                      {tile.photos.map((p, pi) => (
+                        accessToken && p.fileId ? (
+                          <img key={pi} src={`https://www.googleapis.com/drive/v3/files/${p.fileId}?alt=media&access_token=${accessToken}`}
+                            alt={p.name} className="result-photo-img" />
+                        ) : null
+                      ))}
+                    </div>
+                  )}
+                  {tile.status === 'pending' && <p style={{margin: 0, fontSize: '12px', color: '#888', fontStyle: 'italic'}}>⏳ Awaiting firing</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Page>
+    )
+  }
+
+  return (
+    <Page title={entry.recipeName} backAction={{ content: 'Glaze Inventory', onAction: onBack }}>
+      <BlockStack gap="400">
+
+        <Card>
+          <BlockStack gap="400">
+            <InlineStack align="space-between" blockAlign="start">
+              <BlockStack gap="100">
+                {isCommercial ? (
+                  <>
+                    <Badge tone="info">Commercial</Badge>
+                    {entry.brand && <Text tone="subdued" variant="bodySm">{entry.brand}{entry.coneRange ? ` · Cone ${entry.coneRange}` : ''}</Text>}
+                    {entry.colour && <Text tone="subdued" variant="bodySm">{entry.colour}</Text>}
+                  </>
+                ) : (
+                  <Text tone="subdued" variant="bodySm">
+                    Mixed {entry.dateMixed} · {entry.batchSize}{entry.batchUnit}
+                    {entry.batchCost ? ` · $${entry.batchCost.toFixed(2)}` : ''}
+                  </Text>
+                )}
+                {bestRating > 0 && (
+                  <div className="star-display">
+                    {[1,2,3,4,5].map(n => <span key={n} className={`star-icon ${n <= bestRating ? 'active' : ''}`}>★</span>)}
+                  </div>
+                )}
+              </BlockStack>
+              <Badge tone={STATUS_TONES[status]}>{STATUS_LABELS[status]}</Badge>
+            </InlineStack>
+
+            <div style={{display: 'flex', gap: '6px'}}>
+              {STATUS_OPTIONS.map(s => (
+                <button key={s} type="button" onClick={() => handleStatusChange(s)}
+                  style={{padding: '6px 12px', borderRadius: '6px',
+                    border: `1px solid ${status === s ? '#1a3a5c' : '#c9cccf'}`,
+                    background: status === s ? '#1a3a5c' : 'white',
+                    color: status === s ? 'white' : '#616161',
+                    fontSize: '13px', fontWeight: 500, cursor: 'pointer'}}>
+                  {STATUS_LABELS[s]}
                 </button>
               ))}
             </div>
-            <div className="nav-settings">
-              <button
-                className={`nav-item ${currentScreen === 'settings' ? 'active' : ''}`}
-                onClick={() => handleNavigate('settings')}
-              >
-                Settings
+
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', borderTop: '1px solid #f0f0f0'}}>
+              <div style={{display: 'flex', gap: '8px'}}>
+                {!isCommercial && (
+                  <button type="button" onClick={onMixNew}
+                    style={{padding: '8px 16px', background: '#1a3a5c', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer'}}>
+                    Mix New Batch
+                  </button>
+                )}
+                {isCommercial && (
+                  <button type="button" onClick={() => setEditing(true)}
+                    style={{padding: '8px 16px', background: '#1a3a5c', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer'}}>
+                    Edit
+                  </button>
+                )}
+                <button type="button" onClick={() => setShowTestForm(true)}
+                  style={{padding: '8px 16px', background: '#1a7a1a', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer'}}>
+                  + Start Test
+                </button>
+              </div>
+              <button type="button" onClick={() => setShowDeleteModal(true)}
+                style={{background: 'none', border: 'none', color: '#cc2200', fontSize: '13px', fontWeight: 500, cursor: 'pointer', textDecoration: 'underline'}}>
+                Delete
               </button>
             </div>
-          </div>
-        </>
-      )}
+          </BlockStack>
+        </Card>
 
-      <div className="app-main">
-        {renderScreen()}
-      </div>
-    </div>
+        {!isCommercial && (entry.batchCost || defaultDipCost) && (
+          <Card>
+            <BlockStack gap="300">
+              <Text variant="headingSm">Cost</Text>
+              {entry.batchCost && (
+                <div style={{display: 'flex', justifyContent: 'space-between', padding: '4px 0'}}>
+                  <Text tone="subdued">Batch cost</Text>
+                  <Text fontWeight="semibold">${entry.batchCost.toFixed(2)}{entry.batchCostEstimated ? ' (est.)' : ''}</Text>
+                </div>
+              )}
+              {defaultObj && defaultDipCost && (
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0'}}>
+                  <Text tone="subdued">{defaultObj.category} {defaultObj.variant} per dip</Text>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                    <Text fontWeight="semibold">${defaultDipCost.toFixed(3)}</Text>
+                    <button type="button" onClick={() => setShowDipModal(true)}
+                      style={{background: 'none', border: 'none', color: '#1a3a5c', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline', padding: 0}}>
+                      See more...
+                    </button>
+                  </div>
+                </div>
+              )}
+            </BlockStack>
+          </Card>
+        )}
+
+        {allPhotos.length > 0 && (
+          <Card>
+            <BlockStack gap="300">
+              <Text variant="headingSm">Photos</Text>
+              <div className="result-photos-grid">
+                {allPhotos.slice(0, 6).map((p, i) => (
+                  <DriveImage key={i} fileId={p.fileId} accessToken={accessToken} alt="Glaze result" className="result-photo-img" />
+                ))}
+              </div>
+            </BlockStack>
+          </Card>
+        )}
+
+        {/* Test sessions */}
+        <Card>
+          <BlockStack gap="300">
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+              <Text variant="headingSm">Test Sessions</Text>
+              <button type="button" onClick={() => setShowTestForm(true)}
+                style={{background: 'none', border: '1px solid #1a3a5c', color: '#1a3a5c', borderRadius: '6px', padding: '5px 12px', fontSize: '13px', fontWeight: 600, cursor: 'pointer'}}>
+                + Add Test
+              </button>
+            </div>
+            {relevantTests.length === 0 ? (
+              <Text tone="subdued" variant="bodySm">No tests yet. Start a test to record how this glaze fires.</Text>
+            ) : (
+              relevantTests.map((session, i) => {
+                const allComplete = session.tiles?.every(t => t.status === 'completed')
+                const anyComplete = session.tiles?.some(t => t.status === 'completed')
+                const sessionBest = session.tiles?.reduce((max, t) => Math.max(max, t.rating || 0), 0) || 0
+                const totalTiles = session.tiles?.length || 0
+                return (
+                  <div key={session.id}
+                    onClick={() => setSelectedTest(session)}
+                    style={{display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: i < relevantTests.length - 1 ? '1px solid #f0f0f0' : 'none', cursor: 'pointer'}}>
+                    <div style={{flex: 1}}>
+                      <div style={{fontSize: '13px', fontWeight: 600, color: '#1a1a1a'}}>{session.date}</div>
+                      <div style={{fontSize: '12px', color: '#888'}}>{totalTiles} tile{totalTiles !== 1 ? 's' : ''}</div>
+                    </div>
+                    <span style={{fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '8px', textTransform: 'uppercase',
+                      background: allComplete ? '#d4edda' : anyComplete ? '#e8f0fe' : '#fff3cd',
+                      color: allComplete ? '#155724' : anyComplete ? '#1a3a5c' : '#856404'}}>
+                      {allComplete ? 'Complete' : anyComplete ? 'Partial' : 'Pending'}
+                    </span>
+                    {sessionBest > 0 && (
+                      <div style={{fontSize: '12px', color: '#f0a500'}}>{'★'.repeat(sessionBest)}</div>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </BlockStack>
+        </Card>
+
+        <Card>
+          <BlockStack gap="300">
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+              <div>
+                <Text variant="headingSm">Layering Compatibility</Text>
+                <Text variant="bodySm" tone="subdued">Chemistry-based suggestions from Sidekick</Text>
+              </div>
+              <button type="button" onClick={handleAskLayering} disabled={loadingLayering}
+                style={{padding: '8px 14px', background: '#1a1a1a', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: loadingLayering ? 'not-allowed' : 'pointer', opacity: loadingLayering ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '6px'}}>
+                {loadingLayering ? <Spinner size="small" /> : '✦'}
+                {loadingLayering ? 'Thinking...' : 'Ask Sidekick'}
+              </button>
+            </div>
+            {layeringAdvice && (
+              <div style={{padding: '12px', background: '#f9f7f4', borderRadius: '8px', fontSize: '14px', color: '#333', lineHeight: 1.6, whiteSpace: 'pre-wrap'}}>
+                {layeringAdvice}
+              </div>
+            )}
+          </BlockStack>
+        </Card>
+
+      </BlockStack>
+
+      <Modal open={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="Delete from inventory?"
+        primaryAction={{ content: 'Delete', destructive: true, onAction: () => { onDelete(entry); setShowDeleteModal(false) } }}
+        secondaryActions={[{ content: 'Cancel', onAction: () => setShowDeleteModal(false) }]}>
+        <Modal.Section><Text>This will delete this entry from your glaze inventory.</Text></Modal.Section>
+      </Modal>
+
+      <Modal open={showDipModal} onClose={() => setShowDipModal(false)} title="Per-Dip Cost by Object Type">
+        <Modal.Section>
+          <BlockStack gap="200">
+            <Text tone="subdued" variant="bodySm">Based on SG {glazeDensity.toFixed(2)} · 0.5mm glaze layer</Text>
+            {Object.entries(groupedTypes).map(([category, items]) => (
+              <div key={category}>
+                <div style={{padding: '8px 0 4px', fontSize: '11px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid #f0f0f0', marginBottom: '4px'}}>{category}</div>
+                {items.map(obj => {
+                  const dipCost = getDipCost(obj)
+                  const isDefault = obj.id === defaultObj?.id
+                  return (
+                    <div key={obj.id} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: isDefault ? '7px 8px' : '7px 0', borderBottom: '1px solid #f9f9f9', background: isDefault ? '#f5f0e8' : 'transparent', borderRadius: isDefault ? '4px' : '0'}}>
+                      <span style={{fontSize: '14px', fontWeight: isDefault ? 700 : 400}}>
+                        {obj.variant}
+                        {isDefault && <span style={{fontSize: '11px', color: '#888', marginLeft: '6px'}}>default</span>}
+                      </span>
+                      <span style={{fontSize: '14px', fontWeight: 600, color: dipCost ? '#1a3a5c' : '#aaa'}}>
+                        {dipCost ? `$${dipCost.toFixed(3)}` : 'no price'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+    </Page>
   )
 }
 
-export default App
+export default function GlazeInventoryScreen({
+  glazeInventory, recipes, testResults, clayBodies, accessToken, objectTypes,
+  onUpdateEntry, onDeleteEntry, onMixNew,
+  onSaveTestResult, onDeleteTestResult, photosFolderId,
+}) {
+  const [selectedEntry, setSelectedEntry] = useState(null)
+  const [search, setSearch] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [showAddCommercial, setShowAddCommercial] = useState(false)
+  const [tab, setTab] = useState('all')
+
+  const filtered = [...glazeInventory]
+    .filter(e => !search || e.recipeName?.toLowerCase().includes(search.toLowerCase()))
+    .filter(e => {
+      if (tab === 'mixed') return e.entryType !== 'commercial'
+      if (tab === 'commercial') return e.entryType === 'commercial'
+      return true
+    })
+    .sort((a, b) => (a.recipeName || '').localeCompare(b.recipeName || ''))
+
+  const handleSaveCommercial = (entry) => {
+    onUpdateEntry(entry)
+    setShowAddCommercial(false)
+  }
+
+  if (selectedEntry) {
+    const recipe = recipes?.find(r => r.id === selectedEntry.recipeId)
+    return (
+      <GlazeInventoryDetail
+        entry={selectedEntry}
+        recipe={recipe}
+        recipes={recipes}
+        testResults={testResults}
+        clayBodies={clayBodies}
+        accessToken={accessToken}
+        objectTypes={objectTypes}
+        photosFolderId={photosFolderId}
+        onUpdate={(updated) => { onUpdateEntry(updated); setSelectedEntry(updated) }}
+        onDelete={(entry) => { onDeleteEntry(entry); setSelectedEntry(null) }}
+        onMixNew={() => { const r = recipes?.find(r => r.id === selectedEntry.recipeId); if (r) onMixNew(r) }}
+        onSaveTestResult={onSaveTestResult}
+        onDeleteTestResult={onDeleteTestResult}
+        onBack={() => setSelectedEntry(null)}
+      />
+    )
+  }
+
+  return (
+    <Page
+      title="Glaze Inventory"
+      primaryAction={{ content: 'Add Commercial Glaze', onAction: () => setShowAddCommercial(true) }}
+    >
+      <BlockStack gap="400">
+
+        {showAddCommercial && (
+          <Card>
+            <BlockStack gap="300">
+              <Text variant="headingSm">Add Commercial Glaze</Text>
+              <CommercialGlazeForm
+                onSave={handleSaveCommercial}
+                onCancel={() => setShowAddCommercial(false)}
+              />
+            </BlockStack>
+          </Card>
+        )}
+
+        <div className="library-tabs">
+          <button className={`library-tab ${tab === 'all' ? 'active' : ''}`} onClick={() => setTab('all')}>
+            All <span className="library-tab-count">{glazeInventory.length}</span>
+          </button>
+          <button className={`library-tab ${tab === 'mixed' ? 'active' : ''}`} onClick={() => setTab('mixed')}>
+            Mixed <span className="library-tab-count">{glazeInventory.filter(e => e.entryType !== 'commercial').length}</span>
+          </button>
+          <button className={`library-tab ${tab === 'commercial' ? 'active' : ''}`} onClick={() => setTab('commercial')}>
+            Commercial <span className="library-tab-count">{glazeInventory.filter(e => e.entryType === 'commercial').length}</span>
+          </button>
+        </div>
+
+        <Card>
+          <TextField label="Search" labelHidden placeholder="Search glazes..."
+            value={search} onChange={setSearch} autoComplete="off"
+            clearButton onClearButtonClick={() => setSearch('')} />
+        </Card>
+
+        {filtered.length === 0 ? (
+          <Card>
+            <div style={{padding: '32px', textAlign: 'center'}}>
+              <Text tone="subdued">
+                {search ? 'No glazes match your search.' : 'No glazes in inventory yet. Complete a mixing session or add a commercial glaze.'}
+              </Text>
+            </div>
+          </Card>
+        ) : (
+          <Card padding="0">
+            <div>
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 120px 100px 80px', padding: '10px 16px', borderBottom: '1px solid #f0f0f0', background: '#fafafa'}}>
+                <Text variant="bodySm" fontWeight="semibold" tone="subdued">Name</Text>
+                <Text variant="bodySm" fontWeight="semibold" tone="subdued">Type</Text>
+                <Text variant="bodySm" fontWeight="semibold" tone="subdued">Date</Text>
+                <Text variant="bodySm" fontWeight="semibold" tone="subdued">Status</Text>
+              </div>
+              {filtered.map((entry, index) => {
+                const status = getStatus(entry)
+                const isCommercial = entry.entryType === 'commercial'
+                return (
+                  <div key={entry.id} onClick={() => setSelectedEntry(entry)}
+                    style={{display: 'grid', gridTemplateColumns: '1fr 120px 100px 80px', padding: '12px 16px',
+                      borderBottom: index < filtered.length - 1 ? '1px solid #f5f5f5' : 'none',
+                      cursor: 'pointer', background: 'white', transition: 'background 0.1s'}}
+                    onMouseEnter={e => e.currentTarget.style.background = '#fafafa'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                  >
+                    <div>
+                      <div style={{fontSize: '14px', fontWeight: 600, color: '#1a1a1a'}}>{entry.recipeName}</div>
+                      {isCommercial && entry.brand && <div style={{fontSize: '12px', color: '#888'}}>{entry.brand}{entry.colour ? ` · ${entry.colour}` : ''}</div>}
+                      {!isCommercial && entry.batchSize > 0 && <div style={{fontSize: '12px', color: '#888'}}>{entry.batchSize}{entry.batchUnit}</div>}
+                    </div>
+                    <div style={{display: 'flex', alignItems: 'center'}}>
+                      <span style={{fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '8px',
+                        background: isCommercial ? '#e8f0fe' : '#f0f0f0',
+                        color: isCommercial ? '#1a3a5c' : '#555'}}>
+                        {isCommercial ? 'Commercial' : 'Mixed'}
+                      </span>
+                    </div>
+                    <div style={{display: 'flex', alignItems: 'center'}}>
+                      <Text variant="bodySm" tone="subdued">
+                        {isCommercial ? (entry.coneRange ? `Cone ${entry.coneRange}` : '—') : (entry.dateMixed || '—')}
+                      </Text>
+                    </div>
+                    <div style={{display: 'flex', alignItems: 'center'}}>
+                      <span style={{fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '8px', textTransform: 'uppercase',
+                        background: status === 'used-up' ? '#fff0f0' : status === 'low' ? '#fff8e1' : '#d4edda',
+                        color: status === 'used-up' ? '#cc2200' : status === 'low' ? '#aa7700' : '#155724'}}>
+                        {STATUS_LABELS[status]}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </Card>
+        )}
+
+      </BlockStack>
+
+      <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete from inventory?"
+        primaryAction={{ content: 'Delete', destructive: true, onAction: () => { onDeleteEntry(deleteTarget); setDeleteTarget(null) } }}
+        secondaryActions={[{ content: 'Cancel', onAction: () => setDeleteTarget(null) }]}>
+        <Modal.Section><Text>This will delete this entry from your glaze inventory.</Text></Modal.Section>
+      </Modal>
+    </Page>
+  )
+}
