@@ -84,10 +84,11 @@ export function fromGrams(grams, unit) {
 }
 
 export function getPricePerGram(material) {
-  if (!material.totalCost || !material.startingAmount) return null
-  const startingGrams = toGrams(material.startingAmount, material.unit)
-  if (startingGrams === 0) return null
-  return material.totalCost / startingGrams
+  if (!material.price || !material.priceUnit) return null
+  // Convert price per priceUnit to price per gram
+  const unitsToGrams = { g: 1, kg: 1000, lb: 453.592, oz: 28.3495 }
+  const gramsPerUnit = unitsToGrams[material.priceUnit] || 1000
+  return material.price / gramsPerUnit
 }
 
 export function calcIngredientCost(material, usedGrams) {
