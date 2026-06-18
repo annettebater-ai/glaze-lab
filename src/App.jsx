@@ -634,6 +634,7 @@ function App() {
           glazeInventory={glazeInventory}
           recipes={recipes}
           testResults={testResults}
+          materials={materials}
           accessToken={accessToken}
           objectTypes={objectTypes}
           onUpdateEntry={handleSaveGlazeInventoryEntry}

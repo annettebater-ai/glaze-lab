@@ -442,7 +442,7 @@ Suggest layering combinations and application order. What works well together an
 }
 
 export default function GlazeInventoryScreen({
-  glazeInventory, recipes, testResults, accessToken, objectTypes,
+  glazeInventory, recipes, testResults, materials, accessToken, objectTypes,
   onUpdateEntry, onDeleteEntry, onMixNew,
 }) {
   const [selectedEntry, setSelectedEntry] = useState(null)
