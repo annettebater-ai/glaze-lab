@@ -261,11 +261,37 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onS
   const [activeDiscontinuedBadge, setActiveDiscontinuedBadge] = useState(null)
   const [checkingFlags, setCheckingFlags] = useState(false)
 
-  const FLAG_LABELS = {
-    'not-food-safe': 'Not Food Safe',
-    'not-dishwasher-safe': 'Not Dishwasher Safe',
-    'crazing-risk': 'Crazing Risk',
-    'leaching-risk': 'Leaching Risk',
+  const FLAG_DEFS = {
+    'not-food-safe': { label: 'Not Food Safe', severity: 'critical' },
+    'not-dishwasher-safe': { label: 'Not Dishwasher Safe', severity: 'info' },
+    'crazing-risk': { label: 'Crazing Risk', severity: 'info' },
+  }
+
+  const FlagIcon = ({ type, color }) => {
+    if (type === 'not-food-safe') {
+      return (
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+          <path d="M6 3v6M6 3v6M4 3v4a2 2 0 002 2 2 2 0 002-2V3M6 9v8M14 3c-1.5 0-2.5 1.5-2.5 4s1 4 2.5 4 2.5-1.5 2.5-4-1-4-2.5-4zM14 11v6" stroke={color} strokeWidth="1.4" strokeLinecap="round"/>
+          <line x1="2" y1="2" x2="18" y2="18" stroke={color} strokeWidth="1.6" strokeLinecap="round"/>
+        </svg>
+      )
+    }
+    if (type === 'not-dishwasher-safe') {
+      return (
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+          <rect x="3" y="5" width="14" height="11" rx="1.5" stroke={color} strokeWidth="1.4"/>
+          <path d="M6 5V3.5a1 1 0 011-1h6a1 1 0 011 1V5M6 9c1-1 2 1 3 0s2 1 3 0 2 1 3 0" stroke={color} strokeWidth="1.2" strokeLinecap="round"/>
+          <line x1="2" y1="2" x2="18" y2="18" stroke={color} strokeWidth="1.6" strokeLinecap="round"/>
+        </svg>
+      )
+    }
+    // crazing-risk
+    return (
+      <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+        <circle cx="10" cy="10" r="7.5" stroke={color} strokeWidth="1.4"/>
+        <path d="M10 3l-1.5 4 2 1.5-2.5 3 2 1.5-1 3.5M5 7l2 1.5M15 8l-2 2" stroke={color} strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    )
   }
 
   const handleCheckFlags = async () => {
@@ -289,15 +315,14 @@ Ingredients: ${allIngredients.join(', ')}
 Glaze type/zone: ${recipe.chemistry?.stull?.zone || 'unknown'}
 
 Consider:
-- Food safety: presence of leachable materials like barium, lead, or high amounts of certain colorants in food-contact surfaces
-- Dishwasher safety: whether the glaze surface (e.g. low-fire, matte, underfired) is durable enough to withstand repeated dishwasher cycles without wearing down
-- Crazing risk: thermal expansion mismatch issues
-- Leaching risk: chemical instability under acidic conditions (e.g. lemon juice, vinegar)
+- Not Food Safe: presence of leachable or unstable materials (barium, lead, high colorant loads, chemical instability under acidic conditions) that pose a health risk in food-contact surfaces
+- Not Dishwasher Safe: whether the glaze surface (e.g. low-fire, matte, underfired) is durable enough to withstand repeated dishwasher cycles without wearing down
+- Crazing Risk: thermal expansion mismatch issues causing surface cracking
 
 Respond with ONLY a JSON object, no other text, in this exact format:
 {"flags": [{"type": "not-food-safe", "note": "brief reason"}]}
 
-Valid types are: not-food-safe, not-dishwasher-safe, crazing-risk, leaching-risk. Only include flags that genuinely apply. If none apply, return {"flags": []}.`
+Valid types are: not-food-safe, not-dishwasher-safe, crazing-risk. Only include flags that genuinely apply. If none apply, return {"flags": []}.`
           }]
         })
       })
@@ -519,6 +544,62 @@ Only include materials that are actually discontinued or hard to find. If none a
       <CompatibilityWarnings recipe={recipe} clayBodies={clayBodies} testResults={testResults} />
 
       <div className="detail-section">
+        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px'}}>
+          <h2 className="section-title" style={{margin: 0}}>Flags</h2>
+          <button type="button" onClick={handleCheckFlags} disabled={checkingFlags}
+            style={{padding: '6px 12px', background: '#1a1a1a', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: checkingFlags ? 'not-allowed' : 'pointer', opacity: checkingFlags ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '4px'}}>
+            <span style={{color: '#c8a96e'}}>✦</span>
+            {checkingFlags ? 'Checking...' : 'Check Safety Flags'}
+          </button>
+        </div>
+        {(recipe.flags || []).length > 0 ? (
+          <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px'}}>
+            {(recipe.flags || []).map((flag, i) => {
+              const def = FLAG_DEFS[flag.type] || { label: flag.type, severity: 'info' }
+              const isCritical = def.severity === 'critical'
+              const bg = isCritical ? '#fff0f0' : '#fff8e1'
+              const border = isCritical ? '#ffcccc' : '#ffe082'
+              const color = isCritical ? '#cc2200' : '#aa7700'
+              return (
+                <div key={i} title={flag.note || ''}
+                  style={{fontSize: '12px', fontWeight: 700, padding: '5px 8px 5px 10px', borderRadius: '10px', background: bg, color, border: `1px solid ${border}`, display: 'flex', alignItems: 'center', gap: '6px'}}>
+                  <FlagIcon type={flag.type} color={color} />
+                  {def.label}
+                  {flag.source === 'manual' && <span style={{fontSize: '9px', opacity: 0.7}}>(manual)</span>}
+                  <button type="button" onClick={() => handleToggleManualFlag(flag.type)}
+                    style={{background: 'none', border: 'none', cursor: 'pointer', color, fontSize: '13px', lineHeight: 1, padding: '0 0 0 2px'}}>
+                    ×
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <p style={{marginBottom: '10px', fontSize: '13px', color: '#888'}}>No flags set. Run a check or add manually.</p>
+        )}
+        <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px'}}>
+          {Object.entries(FLAG_DEFS).map(([type, def]) => {
+            const active = (recipe.flags || []).some(f => f.type === type)
+            const color = def.severity === 'critical' ? '#cc2200' : '#aa7700'
+            const bg = def.severity === 'critical' ? '#fff0f0' : '#fff8e1'
+            return (
+              <button key={type} type="button" onClick={() => handleToggleManualFlag(type)}
+                style={{
+                  fontSize: '11px', fontWeight: 600, padding: '5px 10px', borderRadius: '14px',
+                  border: `1px solid ${active ? color : '#c9cccf'}`,
+                  background: active ? bg : 'white',
+                  color: active ? color : '#616161',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px',
+                }}>
+                <FlagIcon type={type} color={active ? color : '#999'} />
+                {def.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="detail-section">
         <div className="section-header-row">
           <h2 className="section-title" style={{marginBottom: 0}}>Test Sessions</h2>
           <button className="add-result-btn" onClick={() => setShowTestForm(true)}>
@@ -709,47 +790,6 @@ Only include materials that are actually discontinued or hard to find. If none a
           <StullChart al2o3={stull.x} sio2={stull.y} zone={stull.zone} />
         </div>
       )}
-
-      <div className="detail-section">
-        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px'}}>
-          <h2 className="section-title" style={{margin: 0}}>Flags</h2>
-          <button type="button" onClick={handleCheckFlags} disabled={checkingFlags}
-            style={{padding: '6px 12px', background: '#1a1a1a', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: checkingFlags ? 'not-allowed' : 'pointer', opacity: checkingFlags ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '4px'}}>
-            <span style={{color: '#c8a96e'}}>✦</span>
-            {checkingFlags ? 'Checking...' : 'Check Safety Flags'}
-          </button>
-        </div>
-        {(recipe.flags || []).length > 0 ? (
-          <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px'}}>
-            {(recipe.flags || []).map((flag, i) => (
-              <div key={i} title={flag.note || ''}
-                style={{fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '10px', background: '#fff0f0', color: '#cc2200', border: '1px solid #ffcccc', display: 'flex', alignItems: 'center', gap: '6px'}}>
-                ⚠ {FLAG_LABELS[flag.type] || flag.type}
-                {flag.source === 'manual' && <span style={{fontSize: '9px', opacity: 0.7}}>(manual)</span>}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p style={{marginBottom: '10px', fontSize: '13px', color: '#888'}}>No flags set. Run a check or add manually.</p>
-        )}
-        <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px'}}>
-          {Object.entries(FLAG_LABELS).map(([type, label]) => {
-            const active = (recipe.flags || []).some(f => f.type === type)
-            return (
-              <button key={type} type="button" onClick={() => handleToggleManualFlag(type)}
-                style={{
-                  fontSize: '11px', fontWeight: 600, padding: '5px 10px', borderRadius: '14px',
-                  border: `1px solid ${active ? '#cc2200' : '#c9cccf'}`,
-                  background: active ? '#fff0f0' : 'white',
-                  color: active ? '#cc2200' : '#616161',
-                  cursor: 'pointer',
-                }}>
-                {label}
-              </button>
-            )
-          })}
-        </div>
-      </div>
 
       {recipe.notes && (
         <div className="detail-section">
