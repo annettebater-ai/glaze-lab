@@ -248,7 +248,7 @@ export default function MaterialsScreen({ materials, onSaveMaterial, onDeleteMat
         ) : (
           <Card padding="0">
             <div>
-              <div style={{display: 'grid', gridTemplateColumns: '1fr 100px 120px 100px', padding: '10px 16px', borderBottom: '1px solid #f0f0f0', background: '#fafafa'}}>
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 100px 120px 80px', padding: '10px 16px', borderBottom: '1px solid #f0f0f0', background: '#fafafa'}}>
                 <Text variant="bodySm" fontWeight="semibold" tone="subdued">Name</Text>
                 <Text variant="bodySm" fontWeight="semibold" tone="subdued">Stock</Text>
                 <Text variant="bodySm" fontWeight="semibold" tone="subdued">Price</Text>
@@ -263,7 +263,7 @@ export default function MaterialsScreen({ materials, onSaveMaterial, onDeleteMat
 
                 return (
                   <div key={material.id} style={{
-                    display: 'grid', gridTemplateColumns: '1fr 100px 120px 100px',
+                    display: 'grid', gridTemplateColumns: '1fr 100px 120px 80px',
                     padding: '12px 16px', alignItems: 'center',
                     borderBottom: index < sorted.length - 1 ? '1px solid #f5f5f5' : 'none',
                     background: 'white',
@@ -297,14 +297,20 @@ export default function MaterialsScreen({ materials, onSaveMaterial, onDeleteMat
                         {priceDisplay}
                       </span>
                     </div>
-                    <div style={{display: 'flex', gap: '6px'}}>
+                    <div style={{display: 'flex', gap: '4px', justifyContent: 'flex-end'}}>
                       <button type="button" onClick={() => setEditingMaterial(material)}
-                        className="material-action-btn">
-                        Edit
+                        title="Edit"
+                        style={{width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: '1px solid #e3e3e3', borderRadius: '6px', cursor: 'pointer', padding: 0}}>
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                          <path d="M14.5 2.5l3 3L7 16l-4 1 1-4L14.5 2.5z" stroke="#1a1a1a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
                       </button>
                       <button type="button" onClick={() => setDeleteTarget(material)}
-                        className="material-action-btn danger">
-                        Delete
+                        title="Delete"
+                        style={{width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: '1px solid #cc2200', borderRadius: '6px', cursor: 'pointer', padding: 0}}>
+                        <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                          <path d="M4 6h12M8 6V4h4v2M6 6l1 11h6l1-11" stroke="#cc2200" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
                       </button>
                     </div>
                   </div>
