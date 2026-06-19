@@ -259,6 +259,76 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onS
   const [discontinuedMap, setDiscontinuedMap] = useState({})
   const [checkingDiscontinued, setCheckingDiscontinued] = useState(false)
   const [activeDiscontinuedBadge, setActiveDiscontinuedBadge] = useState(null)
+  const [checkingFlags, setCheckingFlags] = useState(false)
+
+  const FLAG_LABELS = {
+    'not-food-safe': 'Not Food Safe',
+    'not-dishwasher-safe': 'Not Dishwasher Safe',
+    'crazing-risk': 'Crazing Risk',
+    'leaching-risk': 'Leaching Risk',
+  }
+
+  const handleCheckFlags = async () => {
+    setCheckingFlags(true)
+    try {
+      const allIngredients = [
+        ...(recipe.baseIngredients || []).map(i => `${i.material} ${i.percent}%`),
+        ...(recipe.additives || []).map(a => `${a.material} ${a.percent}%`)
+      ]
+      const response = await fetch('/api/claude', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 400,
+          messages: [{
+            role: 'user',
+            content: `You are a ceramics glaze chemistry safety expert. Analyze this glaze recipe and identify any safety or durability risks.
+
+Ingredients: ${allIngredients.join(', ')}
+Glaze type/zone: ${recipe.chemistry?.stull?.zone || 'unknown'}
+
+Consider:
+- Food safety: presence of leachable materials like barium, lead, or high amounts of certain colorants in food-contact surfaces
+- Dishwasher safety: whether the glaze surface (e.g. low-fire, matte, underfired) is durable enough to withstand repeated dishwasher cycles without wearing down
+- Crazing risk: thermal expansion mismatch issues
+- Leaching risk: chemical instability under acidic conditions (e.g. lemon juice, vinegar)
+
+Respond with ONLY a JSON object, no other text, in this exact format:
+{"flags": [{"type": "not-food-safe", "note": "brief reason"}]}
+
+Valid types are: not-food-safe, not-dishwasher-safe, crazing-risk, leaching-risk. Only include flags that genuinely apply. If none apply, return {"flags": []}.`
+          }]
+        })
+      })
+      const data = await response.json()
+      const text = data.content?.[0]?.text || ''
+      const clean = text.replace(/```json|```/g, '').trim()
+      const parsed = JSON.parse(clean)
+      const aiFlags = (parsed.flags || []).map(f => ({ ...f, source: 'ai' }))
+      const manualFlags = (recipe.flags || []).filter(f => f.source === 'manual')
+      const merged = [...manualFlags]
+      for (const af of aiFlags) {
+        if (!merged.find(f => f.type === af.type)) merged.push(af)
+      }
+      if (onSaveRecipe) onSaveRecipe({ ...recipe, flags: merged })
+    } catch (err) {
+      console.error('Flag check failed:', err)
+    } finally {
+      setCheckingFlags(false)
+    }
+  }
+
+  const handleToggleManualFlag = (type) => {
+    const existing = (recipe.flags || []).find(f => f.type === type)
+    let updated
+    if (existing) {
+      updated = (recipe.flags || []).filter(f => f.type !== type)
+    } else {
+      updated = [...(recipe.flags || []), { type, source: 'manual' }]
+    }
+    if (onSaveRecipe) onSaveRecipe({ ...recipe, flags: updated })
+  }
 
   useEffect(() => {
     if (!recipe) return
@@ -639,6 +709,47 @@ Only include materials that are actually discontinued or hard to find. If none a
           <StullChart al2o3={stull.x} sio2={stull.y} zone={stull.zone} />
         </div>
       )}
+
+      <div className="detail-section">
+        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px'}}>
+          <h2 className="section-title" style={{margin: 0}}>Flags</h2>
+          <button type="button" onClick={handleCheckFlags} disabled={checkingFlags}
+            style={{padding: '6px 12px', background: '#1a1a1a', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: checkingFlags ? 'not-allowed' : 'pointer', opacity: checkingFlags ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '4px'}}>
+            <span style={{color: '#c8a96e'}}>✦</span>
+            {checkingFlags ? 'Checking...' : 'Check Safety Flags'}
+          </button>
+        </div>
+        {(recipe.flags || []).length > 0 ? (
+          <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px'}}>
+            {(recipe.flags || []).map((flag, i) => (
+              <div key={i} title={flag.note || ''}
+                style={{fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '10px', background: '#fff0f0', color: '#cc2200', border: '1px solid #ffcccc', display: 'flex', alignItems: 'center', gap: '6px'}}>
+                ⚠ {FLAG_LABELS[flag.type] || flag.type}
+                {flag.source === 'manual' && <span style={{fontSize: '9px', opacity: 0.7}}>(manual)</span>}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <Text tone="subdued" variant="bodySm" style={{marginBottom: '10px', display: 'block'}}>No flags set. Run a check or add manually.</Text>
+        )}
+        <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px'}}>
+          {Object.entries(FLAG_LABELS).map(([type, label]) => {
+            const active = (recipe.flags || []).some(f => f.type === type)
+            return (
+              <button key={type} type="button" onClick={() => handleToggleManualFlag(type)}
+                style={{
+                  fontSize: '11px', fontWeight: 600, padding: '5px 10px', borderRadius: '14px',
+                  border: `1px solid ${active ? '#cc2200' : '#c9cccf'}`,
+                  background: active ? '#fff0f0' : 'white',
+                  color: active ? '#cc2200' : '#616161',
+                  cursor: 'pointer',
+                }}>
+                {label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
 
       {recipe.notes && (
         <div className="detail-section">
