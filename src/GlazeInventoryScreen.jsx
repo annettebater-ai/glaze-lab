@@ -458,7 +458,16 @@ export default function GlazeInventoryScreen({
       if (tab === 'commercial') return e.entryType === 'commercial'
       return true
     })
-    .sort((a, b) => (a.recipeName || '').localeCompare(b.recipeName || ''))
+    .sort((a, b) => {
+      const aPinned = a.pinned ? 0 : 1
+      const bPinned = b.pinned ? 0 : 1
+      if (aPinned !== bPinned) return aPinned - bPinned
+      const statusOrder = { 'in-stock': 0, 'low': 1, 'used-up': 2 }
+      const aStatus = statusOrder[getStatus(a)]
+      const bStatus = statusOrder[getStatus(b)]
+      if (aStatus !== bStatus) return aStatus - bStatus
+      return (a.recipeName || '').localeCompare(b.recipeName || '')
+    })
 
   const handleSaveCommercial = (entry) => {
     onUpdateEntry(entry)
@@ -532,7 +541,8 @@ export default function GlazeInventoryScreen({
         ) : (
           <Card padding="0">
             <div>
-              <div style={{display: 'grid', gridTemplateColumns: '1fr 120px 100px 80px', padding: '10px 16px', borderBottom: '1px solid #f0f0f0', background: '#fafafa'}}>
+              <div style={{display: 'grid', gridTemplateColumns: '36px 1fr 120px 100px 80px', padding: '10px 16px', borderBottom: '1px solid #f0f0f0', background: '#fafafa'}}>
+                <div />
                 <Text variant="bodySm" fontWeight="semibold" tone="subdued">Name</Text>
                 <Text variant="bodySm" fontWeight="semibold" tone="subdued">Type</Text>
                 <Text variant="bodySm" fontWeight="semibold" tone="subdued">Date</Text>
@@ -547,8 +557,9 @@ export default function GlazeInventoryScreen({
                     onClick={() => setSelectedEntry(entry)}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '1fr 120px 100px 80px',
+                      gridTemplateColumns: '36px 1fr 120px 100px 80px',
                       padding: '12px 16px',
+                      alignItems: 'center',
                       borderBottom: index < filtered.length - 1 ? '1px solid #f5f5f5' : 'none',
                       cursor: 'pointer',
                       background: 'white',
@@ -557,6 +568,14 @@ export default function GlazeInventoryScreen({
                     onMouseEnter={e => e.currentTarget.style.background = '#fafafa'}
                     onMouseLeave={e => e.currentTarget.style.background = 'white'}
                   >
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onUpdateEntry({ ...entry, pinned: !entry.pinned }) }}
+                      title={entry.pinned ? 'Unpin' : 'Pin to top'}
+                      style={{background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: entry.pinned ? '#f0a500' : '#ddd', padding: 0, lineHeight: 1}}
+                    >
+                      {entry.pinned ? '★' : '☆'}
+                    </button>
                     <div>
                       <div style={{fontSize: '14px', fontWeight: 600, color: '#1a1a1a'}}>{entry.recipeName}</div>
                       {isCommercial && entry.brand && (
