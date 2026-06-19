@@ -260,6 +260,7 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onS
   const [checkingDiscontinued, setCheckingDiscontinued] = useState(false)
   const [activeDiscontinuedBadge, setActiveDiscontinuedBadge] = useState(null)
   const [checkingFlags, setCheckingFlags] = useState(false)
+  const [showAddFlagMenu, setShowAddFlagMenu] = useState(false)
 
   const FLAG_DEFS = {
     'not-food-safe': { label: 'Not Food Safe', severity: 'critical' },
@@ -546,28 +547,53 @@ Only include materials that are actually discontinued or hard to find. If none a
       <div className="detail-section">
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px'}}>
           <h2 className="section-title" style={{margin: 0}}>Flags</h2>
-          <button type="button" onClick={handleCheckFlags} disabled={checkingFlags}
-            style={{padding: '6px 12px', background: '#1a1a1a', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: checkingFlags ? 'not-allowed' : 'pointer', opacity: checkingFlags ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '4px'}}>
-            <span style={{color: '#c8a96e'}}>✦</span>
-            {checkingFlags ? 'Checking...' : 'Check Safety Flags'}
-          </button>
+          <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+            <div style={{position: 'relative'}}>
+              <button type="button" onClick={() => setShowAddFlagMenu(!showAddFlagMenu)}
+                title="Add flag manually"
+                style={{width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white', border: '1px solid #c9cccf', borderRadius: '6px', cursor: 'pointer', fontSize: '16px', color: '#1a1a1a', padding: 0}}>
+                +
+              </button>
+              {showAddFlagMenu && (
+                <div style={{position: 'absolute', top: '32px', right: 0, background: 'white', border: '1px solid #e3e3e3', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 50, minWidth: '180px', overflow: 'hidden'}}>
+                  {Object.entries(FLAG_DEFS).map(([type, def]) => {
+                    const active = (recipe.flags || []).some(f => f.type === type)
+                    return (
+                      <button key={type} type="button"
+                        onClick={() => { handleToggleManualFlag(type); setShowAddFlagMenu(false) }}
+                        style={{width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', background: active ? '#f5f5f5' : 'white', border: 'none', borderBottom: '1px solid #f0f0f0', cursor: 'pointer', fontSize: '13px', color: '#1a1a1a', textAlign: 'left'}}>
+                        <FlagIcon type={type} color={def.severity === 'critical' ? '#cc2200' : '#aa7700'} />
+                        {def.label}
+                        {active && <span style={{marginLeft: 'auto', fontSize: '11px', color: '#1a7a1a'}}>✓</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+            <button type="button" onClick={handleCheckFlags} disabled={checkingFlags}
+              style={{padding: '6px 12px', background: '#1a1a1a', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: checkingFlags ? 'not-allowed' : 'pointer', opacity: checkingFlags ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '4px'}}>
+              <span style={{color: '#c8a96e'}}>✦</span>
+              {checkingFlags ? 'Checking...' : 'Check Safety Flags'}
+            </button>
+          </div>
         </div>
         {(recipe.flags || []).length > 0 ? (
-          <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px'}}>
+          <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px'}}>
             {(recipe.flags || []).map((flag, i) => {
               const def = FLAG_DEFS[flag.type] || { label: flag.type, severity: 'info' }
               const isCritical = def.severity === 'critical'
               const bg = isCritical ? '#fff0f0' : '#fff8e1'
               const border = isCritical ? '#ffcccc' : '#ffe082'
               const color = isCritical ? '#cc2200' : '#aa7700'
+              const tooltip = `${def.label}${flag.note ? ' — ' + flag.note : ''}${flag.source === 'manual' ? ' (manual)' : ''}`
               return (
-                <div key={i} title={flag.note || ''}
-                  style={{fontSize: '12px', fontWeight: 700, padding: '5px 8px 5px 10px', borderRadius: '10px', background: bg, color, border: `1px solid ${border}`, display: 'flex', alignItems: 'center', gap: '6px'}}>
+                <div key={i} title={tooltip}
+                  style={{width: '32px', height: '32px', borderRadius: '8px', background: bg, border: `1px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative'}}>
                   <FlagIcon type={flag.type} color={color} />
-                  {def.label}
-                  {flag.source === 'manual' && <span style={{fontSize: '9px', opacity: 0.7}}>(manual)</span>}
                   <button type="button" onClick={() => handleToggleManualFlag(flag.type)}
-                    style={{background: 'none', border: 'none', cursor: 'pointer', color, fontSize: '13px', lineHeight: 1, padding: '0 0 0 2px'}}>
+                    title="Remove"
+                    style={{position: 'absolute', top: '-6px', right: '-6px', width: '16px', height: '16px', borderRadius: '50%', background: color, border: '1.5px solid white', cursor: 'pointer', color: 'white', fontSize: '10px', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0}}>
                     ×
                   </button>
                 </div>
@@ -575,28 +601,8 @@ Only include materials that are actually discontinued or hard to find. If none a
             })}
           </div>
         ) : (
-          <p style={{marginBottom: '10px', fontSize: '13px', color: '#888'}}>No flags set. Run a check or add manually.</p>
+          <p style={{fontSize: '13px', color: '#888', margin: 0}}>No flags set. Run a check or add manually.</p>
         )}
-        <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px'}}>
-          {Object.entries(FLAG_DEFS).map(([type, def]) => {
-            const active = (recipe.flags || []).some(f => f.type === type)
-            const color = def.severity === 'critical' ? '#cc2200' : '#aa7700'
-            const bg = def.severity === 'critical' ? '#fff0f0' : '#fff8e1'
-            return (
-              <button key={type} type="button" onClick={() => handleToggleManualFlag(type)}
-                style={{
-                  fontSize: '11px', fontWeight: 600, padding: '5px 10px', borderRadius: '14px',
-                  border: `1px solid ${active ? color : '#c9cccf'}`,
-                  background: active ? bg : 'white',
-                  color: active ? color : '#616161',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px',
-                }}>
-                <FlagIcon type={type} color={active ? color : '#999'} />
-                {def.label}
-              </button>
-            )
-          })}
-        </div>
       </div>
 
       <div className="detail-section">
