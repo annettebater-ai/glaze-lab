@@ -730,7 +730,7 @@ Only include materials that are actually discontinued or hard to find. If none a
             ))}
           </div>
         ) : (
-          <Text tone="subdued" variant="bodySm" style={{marginBottom: '10px', display: 'block'}}>No flags set. Run a check or add manually.</Text>
+          <p style={{marginBottom: '10px', fontSize: '13px', color: '#888'}}>No flags set. Run a check or add manually.</p>
         )}
         <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px'}}>
           {Object.entries(FLAG_LABELS).map(([type, label]) => {
