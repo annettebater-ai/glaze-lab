@@ -256,6 +256,59 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onS
   const [showTestForm, setShowTestForm] = useState(false)
   const [editingResult, setEditingResult] = useState(null)
   const [selectedResult, setSelectedResult] = useState(null)
+  const [discontinuedMap, setDiscontinuedMap] = useState({})
+  const [checkingDiscontinued, setCheckingDiscontinued] = useState(false)
+  const [activeDiscontinuedBadge, setActiveDiscontinuedBadge] = useState(null)
+
+  useEffect(() => {
+    if (!recipe) return
+    const allMaterialNames = [
+      ...(recipe.baseIngredients || []).map(i => i.material),
+      ...(recipe.additives || []).map(a => a.material)
+    ].filter(Boolean)
+
+    if (allMaterialNames.length === 0) return
+
+    const checkDiscontinued = async () => {
+      setCheckingDiscontinued(true)
+      try {
+        const response = await fetch('/api/claude', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-6',
+            max_tokens: 500,
+            messages: [{
+              role: 'user',
+              content: `You are a ceramics materials expert. For each of these glaze ingredients, tell me if it has been discontinued or is no longer commonly available from Canadian pottery suppliers (PSH, Tuckers, Great White North, Sounding Stone), and if so what it's commonly replaced with.
+
+Ingredients: ${allMaterialNames.join(', ')}
+
+Respond with ONLY a JSON object, no other text, in this exact format:
+{"discontinued": [{"material": "Custer Feldspar", "replacement": "G-200 Feldspar", "ratio": "1:1", "note": "brief reason"}]}
+
+Only include materials that are actually discontinued or hard to find. If none are discontinued, return {"discontinued": []}.`
+            }]
+          })
+        })
+        const data = await response.json()
+        const text = data.content?.[0]?.text || ''
+        const clean = text.replace(/```json|```/g, '').trim()
+        const parsed = JSON.parse(clean)
+        const map = {}
+        for (const item of (parsed.discontinued || [])) {
+          map[item.material.toLowerCase()] = item
+        }
+        setDiscontinuedMap(map)
+      } catch (err) {
+        console.error('Discontinued check failed:', err)
+      } finally {
+        setCheckingDiscontinued(false)
+      }
+    }
+
+    checkDiscontinued()
+  }, [recipe?.id])
 
   if (!recipe) return null
 
@@ -479,15 +532,32 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onS
             </tr>
           </thead>
           <tbody>
-            {(recipe.baseIngredients || []).map((ing, i) => (
-              <tr key={i} className="ing-row">
-                <td className="ing-td">
-                  <span>{ing.material}</span>
-                  <IngredientStockBadge name={ing.material} materials={materials} />
-                </td>
-                <td className="ing-td ing-td-right">{ing.percent}%</td>
-              </tr>
-            ))}
+            {(recipe.baseIngredients || []).map((ing, i) => {
+              const discontinued = discontinuedMap[(ing.material || '').toLowerCase()]
+              return (
+                <tr key={i} className="ing-row">
+                  <td className="ing-td">
+                    <span>{ing.material}</span>
+                    <IngredientStockBadge name={ing.material} materials={materials} />
+                    {discontinued && (
+                      <button type="button"
+                        onClick={() => setActiveDiscontinuedBadge(activeDiscontinuedBadge === `base-${i}` ? null : `base-${i}`)}
+                        style={{marginLeft: '6px', fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '10px', background: '#fff8e1', color: '#aa7700', border: '1px solid #ffe082', cursor: 'pointer'}}>
+                        ⚠ Discontinued
+                      </button>
+                    )}
+                    {discontinued && activeDiscontinuedBadge === `base-${i}` && (
+                      <div style={{marginTop: '6px', padding: '10px 12px', background: '#fff8e1', border: '1px solid #ffe082', borderRadius: '8px', fontSize: '12px', color: '#555'}}>
+                        <strong style={{color: '#1a1a1a'}}>Replace with: {discontinued.replacement}</strong>
+                        {discontinued.ratio && <div>Ratio: {discontinued.ratio}</div>}
+                        {discontinued.note && <div style={{marginTop: '4px', fontStyle: 'italic'}}>{discontinued.note}</div>}
+                      </div>
+                    )}
+                  </td>
+                  <td className="ing-td ing-td-right">{ing.percent}%</td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -503,15 +573,32 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onS
               </tr>
             </thead>
             <tbody>
-              {recipe.additives.filter(a => a.material).map((add, i) => (
-                <tr key={i} className="ing-row">
-                  <td className="ing-td">
-                    <span>{add.material}</span>
-                    <IngredientStockBadge name={add.material} materials={materials} />
-                  </td>
-                  <td className="ing-td ing-td-right">{add.percent}%</td>
-                </tr>
-              ))}
+              {recipe.additives.filter(a => a.material).map((add, i) => {
+                const discontinued = discontinuedMap[(add.material || '').toLowerCase()]
+                return (
+                  <tr key={i} className="ing-row">
+                    <td className="ing-td">
+                      <span>{add.material}</span>
+                      <IngredientStockBadge name={add.material} materials={materials} />
+                      {discontinued && (
+                        <button type="button"
+                          onClick={() => setActiveDiscontinuedBadge(activeDiscontinuedBadge === `add-${i}` ? null : `add-${i}`)}
+                          style={{marginLeft: '6px', fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '10px', background: '#fff8e1', color: '#aa7700', border: '1px solid #ffe082', cursor: 'pointer'}}>
+                          ⚠ Discontinued
+                        </button>
+                      )}
+                      {discontinued && activeDiscontinuedBadge === `add-${i}` && (
+                        <div style={{marginTop: '6px', padding: '10px 12px', background: '#fff8e1', border: '1px solid #ffe082', borderRadius: '8px', fontSize: '12px', color: '#555'}}>
+                          <strong style={{color: '#1a1a1a'}}>Replace with: {discontinued.replacement}</strong>
+                          {discontinued.ratio && <div>Ratio: {discontinued.ratio}</div>}
+                          {discontinued.note && <div style={{marginTop: '4px', fontStyle: 'italic'}}>{discontinued.note}</div>}
+                        </div>
+                      )}
+                    </td>
+                    <td className="ing-td ing-td-right">{add.percent}%</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
