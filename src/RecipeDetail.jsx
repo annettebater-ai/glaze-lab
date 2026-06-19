@@ -280,12 +280,14 @@ export default function RecipeDetail({ recipe, onBack, onStartMix, onDelete, onS
             max_tokens: 500,
             messages: [{
               role: 'user',
-              content: `You are a ceramics materials expert. For each of these glaze ingredients, tell me if it has been discontinued or is no longer commonly available from Canadian pottery suppliers (PSH, Tuckers, Great White North, Sounding Stone), and if so what it's commonly replaced with.
+              content: `You are a ceramics materials expert with current knowledge of the pottery supply industry as of 2026. For each of these glaze ingredients, tell me if it has been discontinued or is no longer commonly available from Canadian pottery suppliers (PSH, Tuckers, Great White North, Sounding Stone), and if so what it's commonly replaced with.
+
+Known recent discontinuations to consider: Custer Feldspar (Pacer Minerals mine closed late 2023, commonly replaced by G-200 EU from Spain or Mahavir from India, roughly 1:1), G-200 Feldspar (also discontinued, replaced by G-200 EU), Gerstley Borate (long discontinued, replaced by Gillespie Borate or a frit blend), Albany Slip (discontinued, replaced by Albany Slip substitute blends). Use this as context but also apply your own knowledge of other materials that may have become unavailable.
 
 Ingredients: ${allMaterialNames.join(', ')}
 
 Respond with ONLY a JSON object, no other text, in this exact format:
-{"discontinued": [{"material": "Custer Feldspar", "replacement": "G-200 Feldspar", "ratio": "1:1", "note": "brief reason"}]}
+{"discontinued": [{"material": "Custer Feldspar", "replacement": "G-200 EU Feldspar", "ratio": "1:1, chemistry adjustment may be needed", "note": "brief reason"}]}
 
 Only include materials that are actually discontinued or hard to find. If none are discontinued, return {"discontinued": []}.`
             }]
