@@ -32,6 +32,38 @@ const FOOD_SAFETY_TONES = {
   unknown: undefined
 }
 
+const FLAG_DEFS = {
+  'not-food-safe': { severity: 'critical', label: 'Not Food Safe' },
+  'not-dishwasher-safe': { severity: 'info', label: 'Not Dishwasher Safe' },
+  'crazing-risk': { severity: 'info', label: 'Crazing Risk' },
+}
+
+function FlagIcon({ type, color }) {
+  if (type === 'not-food-safe') {
+    return (
+      <svg width="13" height="13" viewBox="0 0 20 20" fill="none">
+        <path d="M6 3v6M6 3v6M4 3v4a2 2 0 002 2 2 2 0 002-2V3M6 9v8M14 3c-1.5 0-2.5 1.5-2.5 4s1 4 2.5 4 2.5-1.5 2.5-4-1-4-2.5-4zM14 11v6" stroke={color} strokeWidth="1.4" strokeLinecap="round"/>
+        <line x1="2" y1="2" x2="18" y2="18" stroke={color} strokeWidth="1.6" strokeLinecap="round"/>
+      </svg>
+    )
+  }
+  if (type === 'not-dishwasher-safe') {
+    return (
+      <svg width="13" height="13" viewBox="0 0 20 20" fill="none">
+        <rect x="3" y="5" width="14" height="11" rx="1.5" stroke={color} strokeWidth="1.4"/>
+        <path d="M6 5V3.5a1 1 0 011-1h6a1 1 0 011 1V5M6 9c1-1 2 1 3 0s2 1 3 0 2 1 3 0" stroke={color} strokeWidth="1.2" strokeLinecap="round"/>
+        <line x1="2" y1="2" x2="18" y2="18" stroke={color} strokeWidth="1.6" strokeLinecap="round"/>
+      </svg>
+    )
+  }
+  return (
+    <svg width="13" height="13" viewBox="0 0 20 20" fill="none">
+      <circle cx="10" cy="10" r="7.5" stroke={color} strokeWidth="1.4"/>
+      <path d="M10 3l-1.5 4 2 1.5-2.5 3 2 1.5-1 3.5M5 7l2 1.5M15 8l-2 2" stroke={color} strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
 const STATUS_PROGRESS = {
   testing: 'incomplete',
   stable: 'complete',
@@ -172,10 +204,18 @@ export default function RecipeTable({ recipes, onSelectRecipe, onToggleFavourite
         </IndexTable.Cell>
         <IndexTable.Cell>
           {recipeFlags.length > 0 ? (
-            <div style={{display: 'flex', flexWrap: 'wrap', gap: '4px'}}>
-              {recipeFlags.map((f, i) => (
-                <Badge key={i} tone="critical">{f.type.replace(/-/g, ' ')}</Badge>
-              ))}
+            <div style={{display: 'flex', gap: '4px'}}>
+              {recipeFlags.map((f, i) => {
+                const def = FLAG_DEFS[f.type] || { severity: 'info', label: f.type }
+                const color = def.severity === 'critical' ? '#cc2200' : '#aa7700'
+                const bg = def.severity === 'critical' ? '#fff0f0' : '#fff8e1'
+                return (
+                  <div key={i} title={def.label}
+                    style={{width: '22px', height: '22px', borderRadius: '5px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                    <FlagIcon type={f.type} color={color} />
+                  </div>
+                )
+              })}
             </div>
           ) : (
             <Text tone="subdued">—</Text>
