@@ -111,7 +111,7 @@ export default function RecipeTable({ recipes, onSelectRecipe, onToggleFavourite
       }
       const getVal = (r) => {
         if (sortCol === 'zone') return r.chemistry?.stull?.zone || ''
-        if (sortCol === 'foodSafety') return r.chemistry?.ratios?.foodSafety || ''
+        if (sortCol === 'flags') return (r.flags || []).length
         return r[sortCol] || ''
       }
       const cmp = String(getVal(a)).localeCompare(String(getVal(b)))
@@ -135,7 +135,7 @@ export default function RecipeTable({ recipes, onSelectRecipe, onToggleFavourite
 
   const rowMarkup = filtered.map((recipe, index) => {
     const zone = recipe.chemistry?.stull?.zone || 'unknown'
-    const foodSafety = recipe.chemistry?.ratios?.foodSafety || 'unknown'
+    const recipeFlags = recipe.flags || []
     const available = isAvailable(recipe)
     const tested = isTested(recipe)
 
@@ -171,8 +171,12 @@ export default function RecipeTable({ recipes, onSelectRecipe, onToggleFavourite
           )}
         </IndexTable.Cell>
         <IndexTable.Cell>
-          {foodSafety !== 'unknown' ? (
-            <Badge tone={FOOD_SAFETY_TONES[foodSafety]}>{foodSafety}</Badge>
+          {recipeFlags.length > 0 ? (
+            <div style={{display: 'flex', flexWrap: 'wrap', gap: '4px'}}>
+              {recipeFlags.map((f, i) => (
+                <Badge key={i} tone="critical">{f.type.replace(/-/g, ' ')}</Badge>
+              ))}
+            </div>
           ) : (
             <Text tone="subdued">—</Text>
           )}
@@ -270,9 +274,9 @@ export default function RecipeTable({ recipes, onSelectRecipe, onToggleFavourite
           onSelectionChange={handleSelectionChange}
           sortable={[true, true, true, true, true, true, true, false]}
           sortDirection={sortDir}
-          sortColumnIndex={['name','recipeType','cone','atmosphere','zone','foodSafety','status'].indexOf(sortCol)}
+          sortColumnIndex={['name','recipeType','cone','atmosphere','zone','flags','status'].indexOf(sortCol)}
           onSort={(col, dir) => {
-            const cols = ['name','recipeType','cone','atmosphere','zone','foodSafety','status']
+            const cols = ['name','recipeType','cone','atmosphere','zone','flags','status']
             handleSort(cols[col], dir)
           }}
           headings={[
@@ -281,7 +285,7 @@ export default function RecipeTable({ recipes, onSelectRecipe, onToggleFavourite
             { title: 'Cone' },
             { title: 'Atmosphere' },
             { title: 'Glaze Type' },
-            { title: 'Food Safety' },
+            { title: 'Flags' },
             { title: 'Status' },
             { title: 'Actions' },
           ]}
