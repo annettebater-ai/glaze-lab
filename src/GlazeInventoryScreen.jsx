@@ -553,8 +553,9 @@ Suggest layering combinations and application order. What works well together an
 }
 
 export default function GlazeInventoryScreen({
-  glazeInventory, recipes, testResults, materials, accessToken, objectTypes,
+  glazeInventory, recipes, testResults, materials, clayBodies, accessToken, objectTypes,
   onUpdateEntry, onDeleteEntry, onMixNew,
+  onSaveTestResult, onDeleteTestResult, photosFolderId,
 }) {
   const [selectedEntry, setSelectedEntry] = useState(null)
   const [search, setSearch] = useState('')
@@ -599,6 +600,10 @@ export default function GlazeInventoryScreen({
         onUpdate={(updated) => { onUpdateEntry(updated); setSelectedEntry(updated) }}
         onDelete={(entry) => { onDeleteEntry(entry); setSelectedEntry(null) }}
         onMixNew={() => { const r = recipes?.find(r => r.id === selectedEntry.recipeId); if (r) onMixNew(r) }}
+        clayBodies={clayBodies}
+        photosFolderId={photosFolderId}
+        onSaveTestResult={onSaveTestResult}
+        onDeleteTestResult={onDeleteTestResult}
         onBack={() => setSelectedEntry(null)}
       />
     )
