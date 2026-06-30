@@ -212,6 +212,70 @@ Suggest layering combinations and application order. What works well together an
     )
   }
 
+  if (showTestForm || editingTest) {
+    return (
+      <Page
+        title={editingTest ? 'Edit Test Session' : 'New Test Session'}
+        backAction={{ content: entry.recipeName, onAction: () => { setShowTestForm(false); setEditingTest(null) } }}
+      >
+        <TestResultForm
+          recipe={recipe || { name: entry.recipeName }}
+          existingSession={editingTest || null}
+          accessToken={accessToken}
+          photosFolderId={photosFolderId}
+          clayBodies={clayBodies}
+          onSave={(result) => {
+            result.inventoryId = entry.id
+            result.inventoryName = entry.recipeName
+            onSaveTestResult(result)
+            setShowTestForm(false)
+            setEditingTest(null)
+          }}
+          onCancel={() => { setShowTestForm(false); setEditingTest(null) }}
+          onDelete={editingTest ? (result) => { onDeleteTestResult(result); setEditingTest(null) } : null}
+        />
+      </Page>
+    )
+  }
+
+  if (selectedTest) {
+    return (
+      <Page title={`Test — ${selectedTest.date}`} backAction={{ content: entry.recipeName, onAction: () => setSelectedTest(null) }}>
+        <div style={{padding: '0 16px'}}>
+          <div style={{display: 'flex', gap: '8px', marginBottom: '16px'}}>
+            <button className="detail-mix-btn" style={{background: '#1a3a5c'}}
+              onClick={() => { setEditingTest(selectedTest); setSelectedTest(null) }}>Edit</button>
+            <button className="detail-mix-btn" style={{background: '#cc2200'}}
+              onClick={() => { onDeleteTestResult(selectedTest); setSelectedTest(null) }}>Delete</button>
+          </div>
+          {selectedTest.tiles?.map((tile, i) => (
+            <div key={tile.id || i} style={{border: '1px solid #e8e8e8', borderRadius: '8px', overflow: 'hidden', marginBottom: '10px'}}>
+              <div style={{background: '#1a1a1a', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px'}}>
+                <span style={{fontSize: '12px', fontWeight: 600, color: 'white'}}>Tile {i + 1}</span>
+                <span style={{marginLeft: 'auto', fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '8px',
+                  background: tile.status === 'completed' ? '#d4edda' : '#fff3cd',
+                  color: tile.status === 'completed' ? '#155724' : '#856404'}}>
+                  {tile.status === 'completed' ? 'Complete' : 'Pending'}
+                </span>
+              </div>
+              <div style={{padding: '12px', background: 'white'}}>
+                {tile.clayBody && <p style={{margin: '0 0 6px', fontSize: '12px', color: '#888'}}>{tile.clayBody}</p>}
+                {tile.rating > 0 && (
+                  <div className="star-display" style={{justifyContent: 'flex-start', marginBottom: '6px'}}>
+                    {[1,2,3,4,5].map(n => <span key={n} className={`star-icon ${n <= tile.rating ? 'active' : ''}`}>★</span>)}
+                  </div>
+                )}
+                {tile.notesAfter && <p style={{margin: 0, fontSize: '13px', color: '#555'}}>{tile.notesAfter}</p>}
+                {tile.status === 'pending' && <p style={{margin: 0, fontSize: '12px', color: '#888', fontStyle: 'italic'}}>⏳ Awaiting firing</p>}
+              </div>
+            </div>
+          ))}
+          {selectedTest.notes && <p style={{fontSize: '13px', color: '#555'}}>{selectedTest.notes}</p>}
+        </div>
+      </Page>
+    )
+  }
+
   return (
     <Page title={entry.recipeName} backAction={{ content: 'Glaze Inventory', onAction: onBack }}>
       <BlockStack gap="400">
