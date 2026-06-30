@@ -98,6 +98,7 @@ function App() {
   const [mixingRecipe, setMixingRecipe] = useState(null)
   const [navOpen, setNavOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [sessionExpired, setSessionExpired] = useState(false)
 
   useEffect(() => {
     const hash = window.location.hash
@@ -161,7 +162,12 @@ function App() {
       setStatusMessage('')
     } catch (error) {
       console.error('Vault init error:', error)
-      setStatusMessage('Error connecting to Drive')
+      if (error.isAuthError) {
+        setSessionExpired(true)
+        setStatusMessage('')
+      } else {
+        setStatusMessage('Error connecting to Drive')
+      }
     } finally {
       setLoading(false)
     }
@@ -181,6 +187,7 @@ function App() {
       setRecipes(loaded.filter(Boolean))
     } catch (error) {
       console.error('Failed to load recipes:', error)
+      if (error.isAuthError) throw error
     }
   }
 
@@ -199,6 +206,7 @@ function App() {
       setTestResults(loaded.filter(Boolean))
     } catch (error) {
       console.error('Failed to load test results:', error)
+      if (error.isAuthError) throw error
     }
   }
 
@@ -217,6 +225,7 @@ function App() {
       setMaterials(loaded.filter(Boolean))
     } catch (error) {
       console.error('Failed to load materials:', error)
+      if (error.isAuthError) throw error
     }
   }
 
@@ -235,6 +244,7 @@ function App() {
       setClayBodies(loaded.filter(Boolean))
     } catch (error) {
       console.error('Failed to load clay bodies:', error)
+      if (error.isAuthError) throw error
     }
   }
 
@@ -253,6 +263,7 @@ function App() {
       setGlazeInventory(loaded.filter(Boolean))
     } catch (error) {
       console.error('Failed to load glaze inventory:', error)
+      if (error.isAuthError) throw error
     }
   }
 
@@ -824,7 +835,24 @@ function App() {
         </>
       )}
 
-      <div className="app-main">
+      {sessionExpired && (
+        <div style={{
+          position: 'fixed', top: '56px', left: 0, right: 0, zIndex: 90,
+          background: '#fff3cd', borderBottom: '1px solid #ffe082',
+          padding: '10px 16px', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap'
+        }}>
+          <span style={{fontSize: '13px', color: '#856404', fontWeight: 500}}>
+            Your session expired. You're viewing the last loaded data — reconnect to keep editing.
+          </span>
+          <button type="button" onClick={handleSignIn}
+            style={{padding: '6px 14px', background: '#1a3a5c', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap'}}>
+            Reconnect
+          </button>
+        </div>
+      )}
+
+      <div className="app-main" style={sessionExpired ? {paddingTop: '40px'} : {}}>
         {renderScreen()}
       </div>
     </div>

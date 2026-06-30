@@ -17,7 +17,9 @@ async function driveRequest(url, options) {
   const response = await fetch(url, options)
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))
-    throw new Error(`Drive API error ${response.status}: ${error?.error?.message || 'Unknown error'}`)
+    const err = new Error(`Drive API error ${response.status}: ${error?.error?.message || 'Unknown error'}`)
+    if (response.status === 401) err.isAuthError = true
+    throw err
   }
   return response.json()
 }
@@ -26,9 +28,11 @@ async function findFolder(token, name, parentId = null) {
   let query = `name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`
   if (parentId) query += ` and '${parentId}' in parents`
   const data = await driveRequest(
-    `${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name)`,
+    `${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name,createdTime)&orderBy=createdTime`,
     { headers: authHeaders(token) }
   )
+  // Always return the oldest matching folder for deterministic behavior,
+  // even if duplicates exist.
   return data.files?.[0] || null
 }
 
@@ -224,6 +228,8 @@ stull:
   x-Al2O3: ${stull.x || 0}
   y-SiO2: ${stull.y || 0}
   zone: ${stull.zone || 'unknown'}
+
+flags: ${JSON.stringify(recipe.flags || [])}
 ---
 
 ## Base Glaze
@@ -331,7 +337,15 @@ export function markdownToRecipe(content, fileId) {
           y: getRatio('y-SiO2'),
           zone: get('zone') || 'unknown'
         }
-      }
+      },
+      flags: (() => {
+        try {
+          const flagsRaw = get('flags')
+          return flagsRaw ? JSON.parse(flagsRaw) : []
+        } catch {
+          return []
+        }
+      })()
     }
   } catch (e) {
     console.error('Failed to parse recipe markdown:', e)
