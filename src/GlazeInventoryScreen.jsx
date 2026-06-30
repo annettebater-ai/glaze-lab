@@ -445,6 +445,44 @@ Suggest layering combinations and application order. What works well together an
           </BlockStack>
         </Card>
 
+        <Card>
+          <BlockStack gap="300">
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+              <Text variant="headingSm">Test Sessions</Text>
+              <button type="button" onClick={() => setShowTestForm(true)}
+                style={{background: 'none', border: '1px solid #1a3a5c', color: '#1a3a5c', borderRadius: '6px', padding: '5px 12px', fontSize: '13px', fontWeight: 600, cursor: 'pointer'}}>
+                + Add Test
+              </button>
+            </div>
+            {relevantSessions.length === 0 ? (
+              <Text tone="subdued" variant="bodySm">No tests yet. Start a test to record how this glaze fires.</Text>
+            ) : (
+              relevantSessions.map((session, i) => {
+                const allComplete = session.tiles?.every(t => t.status === 'completed')
+                const anyComplete = session.tiles?.some(t => t.status === 'completed')
+                const sessionBest = session.tiles?.reduce((max, t) => Math.max(max, t.rating || 0), 0) || 0
+                const totalTiles = session.tiles?.length || 0
+                return (
+                  <div key={session.id}
+                    onClick={() => setSelectedTest(session)}
+                    style={{display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderBottom: i < relevantSessions.length - 1 ? '1px solid #f0f0f0' : 'none', cursor: 'pointer'}}>
+                    <div style={{flex: 1}}>
+                      <div style={{fontSize: '13px', fontWeight: 600, color: '#1a1a1a'}}>{session.date}</div>
+                      <div style={{fontSize: '12px', color: '#888'}}>{totalTiles} tile{totalTiles !== 1 ? 's' : ''}</div>
+                    </div>
+                    <span style={{fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '8px', textTransform: 'uppercase',
+                      background: allComplete ? '#d4edda' : anyComplete ? '#e8f0fe' : '#fff3cd',
+                      color: allComplete ? '#155724' : anyComplete ? '#1a3a5c' : '#856404'}}>
+                      {allComplete ? 'Complete' : anyComplete ? 'Partial' : 'Pending'}
+                    </span>
+                    {sessionBest > 0 && <div style={{fontSize: '12px', color: '#f0a500'}}>{'★'.repeat(sessionBest)}</div>}
+                  </div>
+                )
+              })
+            )}
+          </BlockStack>
+        </Card>
+
         {completedTiles.length > 0 && (
           <Card>
             <BlockStack gap="300">
