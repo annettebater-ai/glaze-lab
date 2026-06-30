@@ -91,7 +91,11 @@ export async function readFile(token, fileId) {
     `${DRIVE_API}/files/${fileId}?alt=media`,
     { headers: { 'Authorization': `Bearer ${token}` } }
   )
-  if (!response.ok) throw new Error(`Failed to read file: ${response.status}`)
+  if (!response.ok) {
+    const err = new Error(`Failed to read file: ${response.status}`)
+    if (response.status === 401) err.isAuthError = true
+    throw err
+  }
   return response.text()
 }
 
@@ -113,8 +117,10 @@ export async function createFile(token, folderId, filename, content) {
     }
   )
   if (!response.ok) {
-    const err = await response.json().catch(() => ({}))
-    throw new Error(`Failed to create file: ${err?.error?.message || response.status}`)
+    const errBody = await response.json().catch(() => ({}))
+    const err = new Error(`Failed to create file: ${errBody?.error?.message || response.status}`)
+    if (response.status === 401) err.isAuthError = true
+    throw err
   }
   return response.json()
 }
@@ -131,7 +137,11 @@ export async function updateFile(token, fileId, content) {
       body: content
     }
   )
-  if (!response.ok) throw new Error(`Failed to update file: ${response.status}`)
+  if (!response.ok) {
+    const err = new Error(`Failed to update file: ${response.status}`)
+    if (response.status === 401) err.isAuthError = true
+    throw err
+  }
   return response.json()
 }
 

@@ -12,6 +12,7 @@ import {
   Spinner,
 } from '@shopify/polaris'
 import DriveImage from './DriveImage'
+import TestResultForm from './TestResultForm'
 import { calcSurfaceArea, calcGlazeVolume, groupByCategory, DEFAULT_OBJECT_TYPES } from './objectTypes'
 
 const STATUS_OPTIONS = ['in-stock', 'low', 'used-up']
@@ -92,8 +93,9 @@ function CommercialGlazeForm({ existing, onSave, onCancel }) {
 }
 
 function GlazeInventoryDetail({
-  entry, recipe, testResults, recipes, materials, accessToken, objectTypes,
+  entry, recipe, testResults, recipes, materials, clayBodies, accessToken, objectTypes,
   onUpdate, onDelete, onMixNew, onBack,
+  onSaveTestResult, onDeleteTestResult, photosFolderId,
 }) {
   const [status, setStatus] = useState(getStatus(entry))
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -101,6 +103,9 @@ function GlazeInventoryDetail({
   const [layeringAdvice, setLayeringAdvice] = useState('')
   const [loadingLayering, setLoadingLayering] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [showTestForm, setShowTestForm] = useState(false)
+  const [editingTest, setEditingTest] = useState(null)
+  const [selectedTest, setSelectedTest] = useState(null)
 
   const allTypes = objectTypes || DEFAULT_OBJECT_TYPES
   const isCommercial = entry.entryType === 'commercial'
@@ -273,6 +278,10 @@ Suggest layering combinations and application order. What works well together an
                     Edit
                   </button>
                 )}
+                <button type="button" onClick={() => setShowTestForm(true)}
+                  style={{padding: "8px 16px", background: "#1a7a1a", color: "white", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: 600, cursor: "pointer"}}>
+                  + Start Test
+                </button>
               </div>
               <button type="button" onClick={() => setShowDeleteModal(true)}
                 style={{background: 'none', border: 'none', color: '#cc2200', fontSize: '13px', fontWeight: 500, cursor: 'pointer', textDecoration: 'underline'}}>
